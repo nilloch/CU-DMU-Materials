@@ -26,4 +26,4 @@ bs = [[1.0, 2.0], [3.0, 4.0]]
 @show f(a, bs)
 
 # This is how you create the json file to submit
-HW1.evaluate(f, "cohu1116@colorado.edu")
+HW1.evaluate(f, "collin.hudson@colorado.edu")
