@@ -19,19 +19,6 @@ differ from this considerably.
 # Question 3
 ############
 
-# @show actions(grid_world) # prints the actions. In this case each action is a Symbol. Use ?Symbol to find out more.
-# T = transition_matrices(grid_world)
-# @show size(T[:left]) 
-# display(T) # this is a Dict that contains a transition matrix for each action
-
-# @show T[:left][1, 2] # the probability of transitioning between states with indices 1 and 2 when taking action :left
-
-# R = reward_vectors(grid_world)
-# @show size(R[:left])
-# display(R) # this is a Dict that contains a reward vector for each action
-
-# @show R[:right][1] # the reward for taking action :right in the state with index 1
-
 function value_iteration(m)
     # It is good to put performance-critical code in a function: https://docs.julialang.org/en/v1/manual/performance-tips/
 
@@ -50,11 +37,11 @@ function value_iteration(m)
         end
         Vprime = maximum(temp, dims=2)
     end
-    return reshape(V[1:100],(10,10))
+    return V
 end
 V = value_iteration(grid_world)
 # You can use the following commented code to display the value. If you are in an environment with multimedia capability (e.g. Jupyter, Pluto, VSCode, Juno), you can display the environment with the following commented code. From the REPL, you can use the ElectronDisplay package.
-display(render(grid_world, color=V))
+    display(render(grid_world, color=reshape(V[1:100],(10,10))))
 
 ############
 # Question 4
