@@ -19,7 +19,7 @@ differ from this considerably.
 # Question 3
 ############
 
-function value_iteration(m)
+function value_iteration(m,discount)
     # It is good to put performance-critical code in a function: https://docs.julialang.org/en/v1/manual/performance-tips/
 
     V = rand(length(states(m)))
@@ -31,17 +31,18 @@ function value_iteration(m)
     temp = Array{Float64, 2}(undef,length(states(m)),length(actions(m)))
     a = actions(m)
     while norm(V - Vprime,2) > ep
-        V = Vprime
+        V[:] = Vprime
         for j in axes(temp,2)
-            temp[:,j] = R[a[j]] + 0.95*T[a[j]]*Vprime
+            temp[:,j] = R[a[j]] + discount*T[a[j]]*Vprime
         end
-        Vprime = maximum(temp, dims=2)
+        Vprime[:] = maximum(temp, dims=2)
     end
     return V
 end
-V = value_iteration(grid_world)
+V = value_iteration(grid_world,0.95)
 # You can use the following commented code to display the value. If you are in an environment with multimedia capability (e.g. Jupyter, Pluto, VSCode, Juno), you can display the environment with the following commented code. From the REPL, you can use the ElectronDisplay package.
-    display(render(grid_world, color=reshape(V[1:100],(10,10))))
+    # display(render(grid_world, color=reshape(V[1:100],(10,10))))
+display(render(grid_world, color=V))
 
 ############
 # Question 4
