@@ -8,13 +8,28 @@ using LinearAlgebra
 # Question 3
 ############
 
-function value_iteration(m,discount,sprc)
+# function checkState(state)::Float64
+#     if(state[4] <= 100.0)
+#         @show state
+#         return -100.0
+#     else
+#         return 0.0
+#     end
+# end
+function value_iteration(m,discount,ACAS)
     # It is good to put performance-critical code in a function: https://docs.julialang.org/en/v1/manual/performance-tips/
-
-    V = rand(length(states(m)))
-    Vprime = rand(length(states(m)))
-    R = reward_vectors(m)
-    T = transition_matrices(m,sparse=sprc)
+    if(!ACAS)
+        V = rand(length(states(m)))
+        Vprime = rand(length(states(m)))
+        R = reward_vectors(m)
+        T = transition_matrices(m,sparse=false)
+    else
+        V = rand(length(states(m)))
+        # Vprime = checkState.(states(m))
+        Vprime = 0*V
+        R = reward_vectors(m)
+        T = transition_matrices(m,sparse=true)
+    end
     # put your value iteration code here
     ep = 1e-7
     temp = Array{Float64, 2}(undef,length(states(m)),length(actions(m)))
@@ -28,24 +43,25 @@ function value_iteration(m,discount,sprc)
     end
     return V
 end
-V = value_iteration(grid_world,0.95,false)
+# V = value_iteration(grid_world,0.95,false)
 # You can use the following commented code to display the value. If you are in an environment with multimedia capability (e.g. Jupyter, Pluto, VSCode, Juno), you can display the environment with the following commented code. From the REPL, you can use the ElectronDisplay package.
     # display(render(grid_world, color=reshape(V[1:100],(10,10))))
-display(render(grid_world, color=V))
+# display(render(grid_world, color=V))
 
 ############
 # Question 4
 ############
 
 # You can create an mdp object representing the problem with the following:
-m = UnresponsiveACASMDP(7)
+m = UnresponsiveACASMDP(5)
 
 # transition_matrices and reward_vectors work the same as for grid_world, however this problem is much larger, so you will have to exploit the structure of the problem. In particular, you may find the docstring of transition_matrices helpful:
-display(@doc(transition_matrices))
+# display(@doc(transition_matrices))
 
 V = value_iteration(m,0.99,true)
+# @profview value_iteration(m,0.99,true)
 
-@show HW2.evaluate(V)
+# @show HW2.evaluate(V)
 
 HW2.evaluate(V, "collin.hudson@colorado.edu")
 
