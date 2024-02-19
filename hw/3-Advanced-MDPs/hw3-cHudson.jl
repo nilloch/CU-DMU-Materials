@@ -23,26 +23,59 @@ Please make sure to update DMUStudent to gain access to the HW3 module.
 # Question 2
 ############
 
+mrand = HW3.DenseGridWorld(seed=3)
 m = HW3.DenseGridWorld()
-
 function rollout(mdp, policy_function, s0, max_steps=100)
     # fill this in with code from the assignment document
-    return 0.0 # replace this with the reward
+    r_total = 0.0
+    t = 0
+    s = s0
+    while !isterminal(mdp, s) && t < max_steps
+        a = policy_function(m,s)
+        s, r = @gen(:sp,:r)(mdp, s, a)
+        r_total += discount(m)^t*r
+        t += 1
+    end
+    return r_total # replace this with the reward
 end
 
 function heuristic_policy(m, s)
-    # put a smarter heuristic policy here
+    # closeness of x and y coords to a multiple of 20 
+    xclose = modf(s[1]/20)[1]
+    yclose = modf(s[2]/20)[1]
+    if xclose > yclose
+        if xclose >= 0.5 || s[1] < 20
+            return :right
+        else
+            return :left
+        end
+    else
+        if yclose >= 0.5 || s[2] < 20
+            return :up
+        else
+            return :down
+        end
+    end
+end
+
+function randPolicy(m,s)
     return rand(actions(m))
 end
 
+maxRuns = 500
 # This code runs monte carlo simulations: you can calculate the mean and standard error from the results
-@show results = [rollout(m, heuristic_policy, rand(initialstate(m))) for _ in 1:10]
+resultsRand = [rollout(mrand, randPolicy, rand(initialstate(m))) for _ in 1:maxRuns]
+@show meanRand = sum(resultsRand)/maxRuns
+@show SEMRand = sqrt(sum(abs2,(resultsRand .- meanRand))/maxRuns^2)
+results = [rollout(mrand, heuristic_policy, rand(initialstate(m))) for _ in 1:maxRuns]
+@show meanRes = sum(results)/maxRuns
+@show SEMRes = sqrt(sum(abs2,(results .- meanRes))/maxRuns^2)
 
 
 ############
 # Question 3
 ############
-
+#=
 m = DenseGridWorld()
 
 S = statetype(m)
@@ -108,3 +141,4 @@ HW3.evaluate(select_action, "your.gradescope.email@colorado.edu")
 # You may wish to call select_action once or twice before submitting it to evaluate to make sure that all parts of the function are precompiled.
 
 # Instead of submitting a select_action function, you can alternatively submit a POMDPs.Solver object that will get 50ms of time to run solve(solver, m) to produce a POMDPs.Policy object that will be used for planning for each grid world.
+=#
