@@ -24,7 +24,6 @@ Please make sure to update DMUStudent to gain access to the HW3 module.
 ############
 
 mrand = HW3.DenseGridWorld(seed=3)
-m = HW3.DenseGridWorld()
 function rollout(mdp, policy_function, s0, max_steps=100)
     # fill this in with code from the assignment document
     r_total = 0.0
@@ -75,21 +74,67 @@ results = [rollout(mrand, heuristic_policy, rand(initialstate(m))) for _ in 1:ma
 ############
 # Question 3
 ############
-#=
-m = DenseGridWorld()
 
+m = HW3.DenseGridWorld(seed=4)
 S = statetype(m)
 A = actiontype(m)
-
-# These would be appropriate containers for your Q, N, and t dictionaries:
-n = Dict{Tuple{S, A}, Int}()
-q = Dict{Tuple{S, A}, Float64}()
-t = Dict{Tuple{S, A, S}, Int}()
 
 # This is an example state - it is a StaticArrays.SVector{2, Int}
 s = SA[19,19]
 @show typeof(s)
 @assert s isa statetype(m)
+
+# Adapted from Chapter 9 of Algorithms for Decision Making by Mykel J. Kochenderfer, Tim A. Wheeler, and Kyle H. Wray (MIT Press, 2022).
+struct mcStruct
+    P::typeof(HW3.DenseGridWorld()) #problem 
+    n = Dict{Tuple{S, A}, Int}() #number of times node visited dict
+    q = Dict{Tuple{S, A}, Float64}() #action value estimate dict
+    t = Dict{Tuple{S, A, S}, Int}() # number of times transition generated dict
+    c::Float64 #exploration constant
+    d::Int # depth
+    numS::Int #number of sims to run
+
+end
+
+function (mcS::mcStruct)(s)
+    for k in 1:mcS.numS
+        simulate!(mcS, s)
+    end
+    return argmax(a->mcS.Q[(s,a)], actions(mcS.P))
+end
+
+bonus(Nsa, Ns) = Nsa == 0 ? Inf : sqrt(log(Ns)/Nsa)
+
+function explore(mcS::mcStruct, s)
+    A, N, Q, c = actions(mcS.P), mcS.N, mcS.Q, mcS.c
+    Ns = sum(N[(s,a)] for a in A)
+    return argmax(a->Q[(s,a)] + c*bonus(N[(s,a)], Ns), A)
+end
+
+function simulate!(mcS::mcStruct, s, d = mcS.d)
+    if d ≤ 0
+        return mcS.U(s)
+    end
+    N, Q = mcS.N, mcS.Q
+    if !haskey(N, (s, first(actions(mcS.P))))
+        for a in actions(mcS.P)
+            N[(s,a)] = 0
+            Q[(s,a)] = 0.0
+        end
+        return mcS.U(s)
+    end
+    a = explore(mcS, s)
+    sp, r = @gen(:sp,:r)(mcS.P, s, a)
+    q = r + mcS.P.discount*simulate!(mcS, sp, d-1)
+    N[(s,a)] += 1
+    Q[(s,a)] += (q-Q[(s,a)])/N[(s,a)]
+    return q
+
+end
+
+
+
+
 
 # here is an example of how to visualize a dummy tree (q, n, and t should actually be filled in your mcts code, but for this we fill it manually)
 q[(SA[1,1], :right)] = 0.0
@@ -98,12 +143,13 @@ n[(SA[1,1], :right)] = 1
 n[(SA[2,1], :right)] = 0
 t[(SA[1,1], :right, SA[2,1])] = 1
 
-inbrowser(visualize_tree(q, n, t, SA[1,1]), "google-chrome")
+# inbrowser(visualize_tree(q, n, t, SA[1,1]), "google-chrome")
+display(visualize_tree(q, n, t, SA[1,1]))
 
 ############
 # Question 4
 ############
-
+#=
 # A starting point for the MCTS select_action function which can be used for Questions 4 and 5
 function select_action(m, s)
 
