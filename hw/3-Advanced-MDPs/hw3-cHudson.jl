@@ -24,6 +24,7 @@ Please make sure to update DMUStudent to gain access to the HW3 module.
 ############
 
 mrand = HW3.DenseGridWorld(seed=3)
+m = HW3.DenseGridWorld()
 function rollout(mdp, policy_function, s0, max_steps=100)
     # fill this in with code from the assignment document
     r_total = 0.0
@@ -63,10 +64,10 @@ end
 
 maxRuns = 500
 # This code runs monte carlo simulations: you can calculate the mean and standard error from the results
-resultsRand = [rollout(mrand, randPolicy, rand(initialstate(m))) for _ in 1:maxRuns]
+resultsRand = [rollout(mrand, randPolicy, rand(initialstate(mrand))) for _ in 1:maxRuns]
 @show meanRand = sum(resultsRand)/maxRuns
 @show SEMRand = sqrt(sum(abs2,(resultsRand .- meanRand))/maxRuns^2)
-results = [rollout(mrand, heuristic_policy, rand(initialstate(m))) for _ in 1:maxRuns]
+results = [rollout(mrand, heuristic_policy, rand(initialstate(mrand))) for _ in 1:maxRuns]
 @show meanRes = sum(results)/maxRuns
 @show SEMRes = sqrt(sum(abs2,(results .- meanRes))/maxRuns^2)
 
@@ -87,13 +88,12 @@ s = SA[19,19]
 # Adapted from Chapter 9 of Algorithms for Decision Making by Mykel J. Kochenderfer, Tim A. Wheeler, and Kyle H. Wray (MIT Press, 2022).
 struct mcStruct
     P::typeof(HW3.DenseGridWorld()) #problem 
-    n = Dict{Tuple{S, A}, Int}() #number of times node visited dict
-    q = Dict{Tuple{S, A}, Float64}() #action value estimate dict
-    t = Dict{Tuple{S, A, S}, Int}() # number of times transition generated dict
     c::Float64 #exploration constant
     d::Int # depth
     numS::Int #number of sims to run
-
+    n #number of times node visited dict
+    q #action value estimate dict
+    t # number of times transition generated dict
 end
 
 function (mcS::mcStruct)(s)
@@ -112,8 +112,8 @@ function explore(mcS::mcStruct, s)
 end
 
 function simulate!(mcS::mcStruct, s, d = mcS.d)
-    if d ≤ 0
-        return mcS.U(s)
+    if d <= 0
+        return rollout(mcS.P, heuristic_policy, s)
     end
     N, Q = mcS.N, mcS.Q
     if !haskey(N, (s, first(actions(mcS.P))))
@@ -121,7 +121,7 @@ function simulate!(mcS::mcStruct, s, d = mcS.d)
             N[(s,a)] = 0
             Q[(s,a)] = 0.0
         end
-        return mcS.U(s)
+        return rollout(mcS.P, heuristic_policy, s)
     end
     a = explore(mcS, s)
     sp, r = @gen(:sp,:r)(mcS.P, s, a)
@@ -129,7 +129,6 @@ function simulate!(mcS::mcStruct, s, d = mcS.d)
     N[(s,a)] += 1
     Q[(s,a)] += (q-Q[(s,a)])/N[(s,a)]
     return q
-
 end
 
 
@@ -137,14 +136,15 @@ end
 
 
 # here is an example of how to visualize a dummy tree (q, n, and t should actually be filled in your mcts code, but for this we fill it manually)
-q[(SA[1,1], :right)] = 0.0
-q[(SA[2,1], :right)] = 0.0
-n[(SA[1,1], :right)] = 1
-n[(SA[2,1], :right)] = 0
-t[(SA[1,1], :right, SA[2,1])] = 1
+test = mcStruct(m,0.25,7,20,Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A,S}, Int}())
+test.q[(SA[1,1], :right)] = 0.0
+test.q[(SA[2,1], :right)] = 0.0
+test.n[(SA[1,1], :right)] = 1
+test.n[(SA[2,1], :right)] = 0
+test.t[(SA[1,1], :right, SA[2,1])] = 1
 
-# inbrowser(visualize_tree(q, n, t, SA[1,1]), "google-chrome")
-display(visualize_tree(q, n, t, SA[1,1]))
+inbrowser(visualize_tree(test.q, test.n, test.t, SA[1,1]), `cmd.exe /C start chrome`)
+# display(visualize_tree(test.q, test.n, test.t, SA[1,1]))
 
 ############
 # Question 4
