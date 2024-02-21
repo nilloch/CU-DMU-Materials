@@ -82,7 +82,7 @@ A = actiontype(m)
 
 # This is an example state - it is a StaticArrays.SVector{2, Int}
 s = SA[19,19]
-@show typeof(s)
+# @show typeof(s)
 @assert s isa statetype(m)
 
 # Adapted from Chapter 9 of Algorithms for Decision Making by Mykel J. Kochenderfer, Tim A. Wheeler, and Kyle H. Wray (MIT Press, 2022).
@@ -100,13 +100,13 @@ function (mcS::mcStruct)(s)
     for k in 1:mcS.numS
         simulate!(mcS, s)
     end
-    return argmax(a->mcS.Q[(s,a)], actions(mcS.P))
+    return argmax(a->mcS.q[(s,a)], actions(mcS.P))
 end
 
 bonus(Nsa, Ns) = Nsa == 0 ? Inf : sqrt(log(Ns)/Nsa)
 
 function explore(mcS::mcStruct, s)
-    A, N, Q, c = actions(mcS.P), mcS.N, mcS.Q, mcS.c
+    A, N, Q, c = actions(mcS.P), mcS.n, mcS.q, mcS.c
     Ns = sum(N[(s,a)] for a in A)
     return argmax(a->Q[(s,a)] + c*bonus(N[(s,a)], Ns), A)
 end
@@ -115,7 +115,7 @@ function simulate!(mcS::mcStruct, s, d = mcS.d)
     if d <= 0
         return rollout(mcS.P, heuristic_policy, s)
     end
-    N, Q = mcS.N, mcS.Q
+    N, Q = mcS.n, mcS.q
     if !haskey(N, (s, first(actions(mcS.P))))
         for a in actions(mcS.P)
             N[(s,a)] = 0
@@ -126,24 +126,17 @@ function simulate!(mcS::mcStruct, s, d = mcS.d)
     a = explore(mcS, s)
     sp, r = @gen(:sp,:r)(mcS.P, s, a)
     q = r + mcS.P.discount*simulate!(mcS, sp, d-1)
+    if !isnothing(mcS.t)
+        mcS.t[s,a,sp] = get(mcS.t,(s,a,sp),0) + 1
+    end
     N[(s,a)] += 1
     Q[(s,a)] += (q-Q[(s,a)])/N[(s,a)]
     return q
 end
-
-
-
-
-
 # here is an example of how to visualize a dummy tree (q, n, and t should actually be filled in your mcts code, but for this we fill it manually)
-test = mcStruct(m,0.25,7,20,Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A,S}, Int}())
-test.q[(SA[1,1], :right)] = 0.0
-test.q[(SA[2,1], :right)] = 0.0
-test.n[(SA[1,1], :right)] = 1
-test.n[(SA[2,1], :right)] = 0
-test.t[(SA[1,1], :right, SA[2,1])] = 1
-
-inbrowser(visualize_tree(test.q, test.n, test.t, SA[1,1]), `cmd.exe /C start chrome`)
+test = mcStruct(m,200,50,7,Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A}, Float64}(),Dict{Tuple{S, A, S}, Int}())
+test(s)
+inbrowser(visualize_tree(test.q, test.n, test.t, SA[19,19]), `cmd.exe /C start chrome \\\\wsl.localhost/Ubuntu-22.04/`)
 # display(visualize_tree(test.q, test.n, test.t, SA[1,1]))
 
 ############
