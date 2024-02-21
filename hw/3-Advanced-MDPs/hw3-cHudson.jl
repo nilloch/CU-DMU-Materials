@@ -96,7 +96,7 @@ struct mcStruct
     t # number of times transition generated dict
 end
 
-function (mcS::mcStruct)(s)
+function (mcS::mcStruct)(m,s)
     for k in 1:mcS.numS
         simulate!(mcS, s)
     end
@@ -112,7 +112,7 @@ function explore(mcS::mcStruct, s)
 end
 
 function simulate!(mcS::mcStruct, s, d = mcS.d)
-    if d <= 0
+    if d <= 0 || isterminal(mcS.P,s)
         return rollout(mcS.P, heuristic_policy, s)
     end
     N, Q = mcS.n, mcS.q
@@ -133,41 +133,39 @@ function simulate!(mcS::mcStruct, s, d = mcS.d)
     Q[(s,a)] += (q-Q[(s,a)])/N[(s,a)]
     return q
 end
-# here is an example of how to visualize a dummy tree (q, n, and t should actually be filled in your mcts code, but for this we fill it manually)
-test = mcStruct(m,200,50,7,Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A}, Float64}(),Dict{Tuple{S, A, S}, Int}())
-test(s)
-inbrowser(visualize_tree(test.q, test.n, test.t, SA[19,19]), `cmd.exe /C start chrome \\\\wsl.localhost/Ubuntu-22.04/`)
-# display(visualize_tree(test.q, test.n, test.t, SA[1,1]))
+
+test = mcStruct(m,200.0,50,7,Dict{Tuple{S, A}, Int}(),Dict{Tuple{S, A}, Float64}(),Dict{Tuple{S, A, S}, Int}())
+# @show test(m,s)
+# inbrowser(visualize_tree(test.q, test.n, test.t, SA[19,19]), `cmd.exe /C start chrome \\\\wsl.localhost/Ubuntu-22.04/`)
 
 ############
 # Question 4
 ############
-#=
-# A starting point for the MCTS select_action function which can be used for Questions 4 and 5
-function select_action(m, s)
 
-    start = time_ns()
-    n = Dict{Tuple{statetype(m), actiontype(m)}, Int}()
-    q = Dict{Tuple{statetype(m), actiontype(m)}, Float64}()
+maxRuns = 100
 
+monte = mcStruct(m,300.0,100,1000,Dict{Tuple{statetype(m), actiontype(m)}, Int}(),Dict{Tuple{statetype(m), actiontype(m)}, Float64}(),nothing)
 
-    for _ in 1:1000
-    # while time_ns() < start + 40_000_000 # you can replace the above line with this if you want to limit this loop to run within 40ms
-        break # replace this with mcts iterations to fill n and q
-    end
-
-    # select a good action based on q and/or n
-
-    return rand(actions(m)) # this dummy function returns a random action, but you should return your selected action
-end
-
-@btime select_action(m, SA[35,35]) # you can use this to see how much time your function takes to run. A good time is 10-20ms.
+results = [rollout(m, monte, rand(initialstate(m))) for _ in 1:maxRuns]
+@show meanResMC = sum(results)/maxRuns
+@show SEMResMC = sqrt(sum(abs2,(results .- meanRes))/maxRuns^2)
 
 ############
 # Question 5
 ############
 
-HW3.evaluate(select_action, "your.gradescope.email@colorado.edu")
+function select_action(m, s)
+
+    start = time_ns()
+    monte = mcStruct(m,300.0,100,1000,Dict{Tuple{statetype(m), actiontype(m)}, Int}(),Dict{Tuple{statetype(m), actiontype(m)}, Float64}(),nothing)
+
+    while time_ns() < start + 40_000_000 # you can replace the above line with this if you want to limit this loop to run within 40ms
+        simulate!(monte, s) # replace this with mcts iterations to fill n and q
+    end
+    return argmax(a->monte.q[(s,a)], actions(monte.P))
+end
+
+HW3.evaluate(select_action, "collin.hudson@colorado.edu",time=true)
 
 # If you want to see roughly what's in the evaluate function (with the timing code removed), check sanitized_evaluate.jl
 
@@ -180,4 +178,3 @@ HW3.evaluate(select_action, "your.gradescope.email@colorado.edu")
 # You may wish to call select_action once or twice before submitting it to evaluate to make sure that all parts of the function are precompiled.
 
 # Instead of submitting a select_action function, you can alternatively submit a POMDPs.Solver object that will get 50ms of time to run solve(solver, m) to produce a POMDPs.Policy object that will be used for planning for each grid world.
-=#
