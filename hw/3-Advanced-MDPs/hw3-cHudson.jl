@@ -146,9 +146,9 @@ maxRuns = 100
 
 monte = mcStruct(m,300.0,100,1000,Dict{Tuple{statetype(m), actiontype(m)}, Int}(),Dict{Tuple{statetype(m), actiontype(m)}, Float64}(),nothing)
 
-results = [rollout(m, monte, rand(initialstate(m))) for _ in 1:maxRuns]
-@show meanResMC = sum(results)/maxRuns
-@show SEMResMC = sqrt(sum(abs2,(results .- meanRes))/maxRuns^2)
+# results = [rollout(m, monte, rand(initialstate(m))) for _ in 1:maxRuns]
+# @show meanResMC = sum(results)/maxRuns
+# @show SEMResMC = sqrt(sum(abs2,(results .- meanRes))/maxRuns^2)
 
 ############
 # Question 5
@@ -157,9 +157,9 @@ results = [rollout(m, monte, rand(initialstate(m))) for _ in 1:maxRuns]
 function select_action(m, s)
 
     start = time_ns()
-    monte = mcStruct(m,300.0,100,1000,Dict{Tuple{statetype(m), actiontype(m)}, Int}(),Dict{Tuple{statetype(m), actiontype(m)}, Float64}(),nothing)
+    monte = mcStruct(m,100.0,5,1000,Dict{Tuple{statetype(m), actiontype(m)}, Int}(),Dict{Tuple{statetype(m), actiontype(m)}, Float64}(),nothing)
 
-    while time_ns() < start + 40_000_000 # you can replace the above line with this if you want to limit this loop to run within 40ms
+    while time_ns() < start + 10_000_000 # you can replace the above line with this if you want to limit this loop to run within 40ms
         simulate!(monte, s) # replace this with mcts iterations to fill n and q
     end
     return argmax(a->monte.q[(s,a)], actions(monte.P))
