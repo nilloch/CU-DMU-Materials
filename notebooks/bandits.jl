@@ -1,11 +1,17 @@
+# module Bandits
+
 using Printf
 using Random
 using PGFPlots
 
+# export Bandit, BanditPolicy, BanditStatistics, arm, reset!
+
+# export Bandit, BanditStatistics, BanditPolicy, pull, numArms, update!, winProbabilities, simulate, simulateAverage, learningCurves
+
 mutable struct Bandit
   θ::Vector{Float64} # true bandit probabilities
 end
-Bandit(k::Integer) = Bandit(rand(k))
+Bandit(k::Int) = Bandit(rand(k))
 pull(b::Bandit, i::Integer) = rand() < b.θ[i]
 numArms(b::Bandit) = length(b.θ)
 
@@ -19,12 +25,13 @@ function _get_string_list_of_percentages(bandit_odds::Vector{R}) where {R<:Real}
 end
 
 function banditTrial(b)
+    error("Doesn't work!")
 
     for i in 1 : numArms(b)
         but=button("Arm $i",value=0)
         display(but)
         wins=Observable(0)
-        Interact.@on &but>0 ? (wins[] = wins[]+pull(b,i)) : 0
+        # Interact.@on &but>0 ? (wins[] = wins[]+pull(b,i)) : 0
         display(map(s -> Printf.@sprintf("%d wins out of %d tries (%d percent)", wins[], but[], 100*wins[]/but[]), but))
         # NOTE: we used to use the latex() wrapper
     end
@@ -35,12 +42,14 @@ function banditTrial(b)
 end
 
 function banditEstimation(b)
+    error("Doesn't work!")
+
     B = [button("Arm $i") for i = 1:numArms(b)]
     for i in 1 : numArms(b)
         but=button("Arm $i",value=0)
         display(but)
         wins=Observable(0)
-        Interact.@on &but>0 ? (wins[] = wins[]+pull(b,i)) : 0
+        # Interact.@on &but>0 ? (wins[] = wins[]+pull(b,i)) : 0
         display(map(s -> Printf.@sprintf("%d wins out of %d tries (%d percent)", wins[], but[], 100*wins[]/but[]), but))
         display(map(s -> begin
              w = wins[]
@@ -105,3 +114,5 @@ function learningCurves(b::Bandit, policies; steps=10, iterations=10)
     end
     return lines
 end
+
+# end # module
