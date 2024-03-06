@@ -4,79 +4,101 @@ using StaticArrays: SA, SVector
 using Statistics: mean
 using BenchmarkTools: @btime
 using LinearAlgebra
+using Plots
+import POMDPTools
 
 
 # HW4.evaluate("collin.hudson@colorado.edu",time=true)
-gwe = GridWorldEnv()
 
-function solve!(gwe,T,R,gamma)
-    policy = Dict{Tuple{S}, SVector}()
-    policy' = Dict{Tuple{S}, SVector}()
-    for s in states(gwe)
-        policy[s] = rand(RL.actions(env))
-        policy'[s] = rand(RL.actions(env))
-    end
-    while any(policy'[s] != policy[s] for s in states(gwe))
-        policy = policy'
-        Rp = Array{Float64, 1}(undef,length(states(gwe)))
-        Tp = Array{Float64, 2}(undef,length(states(gwe)),length(states(gwe)))
-        i = 1
-        for s in states(gwe)
-            Rp[i] = R[(s,policy[s])]
-            j = 1
-            for s' in states(gwe)
-                Tp[i,j] = T[(s,policy[s],s')]
-            end
-            i += 1
-        end
-        Up = (I - gamma*Tp)\Rp
-        for s in states(gwe)
-            V = 0
-            policy'[s] = argmax(R[(s,a)] + gamma*T)
+# Copied from the SARSA Jupyter Notebook
+function sarsa_episode!(Q, env; eps=0.1, gamma=0.99, alpha=0.1)
+    start = time()
+    
+    function policy(s)
+        if rand() < eps
+            return rand(RL.actions(env))
+        else
+            return argmax(a->Q[(s, a)], RL.actions(env))
         end
     end
+
+    s = RL.observe(env)
+    a = policy(s)
+    r = RL.act!(env, a)
+    sp = RL.observe(env)
+    hist = [s]
+
+    while !RL.terminated(env)
+        ap = policy(sp)
+
+        Q[(s,a)] += alpha*(r + gamma*Q[(sp, ap)] - Q[(s, a)])
+
+        s = sp
+        a = ap
+        r = RL.act!(env, a)
+        sp = RL.observe(env)
+        push!(hist, sp)
+    end
+
+    Q[(s,a)] += alpha*(r - Q[(s, a)])
+
+    return (hist=hist, Q = copy(Q), time=time()-start)
 end
 
-function evalPolicy!(policy,s,gwe)
-    if !haskey(policy, s)
-        policy[s] = rand(RL.actions(env))
+function sarsa!(env; n_episodes=100)
+    Q = Dict((s, a) => 0.0 for s in RL.observations(env), a in RL.actions(env))
+    episodes = []
+    
+    for i in 1:n_episodes
+        RL.reset!(env)
+        push!(episodes, sarsa_episode!(Q, env, eps=max(0.1, 1-i/n_episodes)))
     end
-    return policy[s]
+    
+    return episodes
+end
+sarsa_episodes = sarsa!(HW4.gw, n_episodes=100_000);
+
+# @manipulate for episode in 1:length(sarsa_episodes), step in 1:maximum(ep->length(ep.hist), sarsa_episodes)
+#     ep = sarsa_episodes[episode]
+#     i = min(step, length(ep.hist))
+#     POMDPTools.render(m, (s=ep.hist[i],), color=s->maximum(map(a->ep.Q[(s,a)], RL.actions(env))))
+# end
+
+function evaluate(env, policy, n_episodes=1000, max_steps=1000, gamma=1.0)
+    returns = Float64[]
+    for _ in 1:n_episodes
+        t = 0
+        r = 0.0
+        RL.reset!(env)
+        s = RL.observe(env)
+        while !RL.terminated(env)
+            a = policy(s)
+            r += gamma^t*RL.act!(env, a)
+            s = RL.observe(env)
+            t += 1
+        end
+        push!(returns, r)
+    end
+    return returns
 end
 
-function TMLMBRL(gwe,steps=100,evals=10,gamma=0.9)
-    policy = Dict{Tuple{S}, SVector}()
-    T = Dict{Tuple{S, A, S}, Float64}() #estimation of transition probability from s via a to s'
-    R = Dict{Tuple{S, A}, Float64}()  #estimation of reward function for a at s
-    N = Dict{Tuple{S, A, S}, Int}() #Dictionary for times went from s via a to s'
-    rho = Dict{Tuple{S, A}, Float64}()  #cumulative reward for a at s
-    s = RL.observe(gwe)
-    for s in states(gwe)
-        for a in actions(gwe)
-            for s' in states(gwe)
-                N[(s,a,s')] = 0
-                rho[(s,a)] = 0
-            end
-        end
+function plotEnv(env,episodes)
+    p = plot(xlabel="steps in environment", ylabel="avg return")
+    n = 20
+    stop = 1000
+    for (name, eps) in episodes
+        Q = Dict((s, a) => 0.0 for s in RL.observations(env), a in RL.actions(env))
+        xs = [0]
+        ys = [mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env))))]
+        for i in n:n:min(stop, length(eps))
+            newsteps = sum(length(ep.hist) for ep in eps[i-n+1:i])
+            push!(xs, last(xs) + newsteps)
+            Q = eps[i].Q
+            push!(ys, mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env)))))
+        end    
+        plot!(p, xs, ys, label=name)
     end
-    for k in 1:steps
-        a = evalPolicy!(policy,s,gwe)
-        r = RL.act!(gwe,a)
-        N[(s,a,RL.observe(gwe))] += 1
-        rho[(s,a)] += r
-        tot = sum(values(N));
-        for s in states(gwe)
-            for a in actions(gwe)
-                for s' in states(gwe)
-                    R[(s,a)] += rho[(s,a)]/tot
-                    T[(s,a,s')] += N[(s,a,s')]/tot
-                end
-            end
-        end
-        if(k%evals = 0)
-            solve!(policy,gwe,T,R,gamma)
-        end
-        s = RL.observe(gwe)
-    end
-
+    p
 end
+episodes = Dict("SARSA"=>sarsa_episodes)
+plotEnv(HW4.gw,episodes)
