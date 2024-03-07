@@ -11,7 +11,7 @@ import POMDPTools
 # HW4.evaluate("collin.hudson@colorado.edu",time=true)
 
 # Copied from the SARSA Jupyter Notebook
-function sarsa_episode!(Q, env; eps=0.1, gamma=0.99, alpha=0.1)
+function sarsa_episode!(Q, env; eps=0.1, gamma=0.99, alpha=0.2)
     start = time()
     
     function policy(s)
@@ -56,7 +56,6 @@ function sarsa!(env; n_episodes=100)
     
     return episodes
 end
-sarsa_episodes = sarsa!(HW4.gw, n_episodes=10_000);
 
 function evaluate(env, policy, n_episodes=1000, max_steps=1000, gamma=1.0)
     returns = Float64[]
@@ -79,71 +78,140 @@ end
 function plotEnv(env,episodes)
     p = plot(xlabel="steps in environment", ylabel="avg return")
     n = 20
-    stop = 1000
+    stop = 50000
     for (name, eps) in episodes
-        Q = Dict((s, a) => 0.0 for s in RL.observations(env), a in RL.actions(env))
-        xs = [0]
-        ys = [mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env))))]
-        for i in n:n:min(stop, length(eps))
-            newsteps = sum(length(ep.hist) for ep in eps[i-n+1:i])
-            push!(xs, last(xs) + newsteps)
-            Q = eps[i].Q
-            push!(ys, mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env)))))
+        if(name == "SARSA")
+            Q = Dict((s, a) => 0.0 for s in RL.observations(env), a in RL.actions(env))
+            xs = [0.0]
+            ys = [mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env))))]
+            for i in n:n:min(stop, length(eps))
+                newsteps = sum(length(ep.hist) for ep in eps[i-n+1:i])
+                push!(xs, last(xs) + newsteps)
+                Q = eps[i].Q
+                push!(ys, mean(evaluate(env, s->argmax(a->Q[(s, a)], RL.actions(env)))))
+            end
+        else
+            xs = [0.0]
+            thetas = Dict((s) => 0.5*ones(4) for s in RL.observations(env))
+            ys = [mean(evaluate(env, s->eps[1].policy(s,thetas)))]
+            for i in n:n:min(stop, length(eps))
+                newsteps = sum(length(ep.hist) for ep in eps[i-n+1:i])
+                push!(xs, last(xs) + newsteps)
+                thetas = eps[i].thetas
+                push!(ys, mean(evaluate(env, s->eps[i].policy(s,thetas))))
+            end
         end    
         plot!(p, xs, ys, label=name)
     end
     p
 end
-
+function getAIdx(a)
+    idx = 1
+    if(a[1] == 0) || (a[1] == -1)
+        idx += 1
+    end
+    if(a[2] == -1)
+        idx += 2
+    elseif a[2] == 1
+        idx += 1
+    end
+    return idx
+end
+function sampleAction(prob)
+    sample = rand()
+    if(sample <= prob[1])
+        return 1
+    elseif(sample <= (prob[1] + prob[2]))
+        return 2
+    elseif(sample <= (prob[1] + prob[2] + prob[3]))
+        return 3
+    else(sample <= (prob[1] + prob[2] + prob[3] + prob[4]))
+        return 4
+    end
+end
 function policyGrad_episode!(thetas,env,alpha,eps=0.1)
-    function policy(s)
+    function policy(s,thetas)
+        softMax = exp.(thetas[s])/sum(exp.(thetas[s]))
+        return RL.actions(env)[sampleAction(softMax)]
+    end
+    function policyEps(s)
         if rand() < eps
             return rand(RL.actions(env))
         else
-            return RL.actions(env)[argmax(thetas[s])]
+            return policy(s,thetas)
         end
     end
-    function logGradSum(x,totr)
-
+    
+    function pgFunc(x)
+        idx = getAIdx(x[2])
+        if(idx == 1)
+            return [1/thetas[x[1]][idx],0.0,0.0,0.0]
+        elseif(idx == 2)
+            return [0.0,1/thetas[x[1]][idx],0.0,0.0]
+        elseif(idx == 3)
+            return [0.0,0.0,1/thetas[x[1]][idx],0.0]
+        elseif(idx == 4)
+            return [0.0,0.0,0.0,1/thetas[x[1]][idx]]
+        end
     end
 
+    # function pgFunc(x)
+    #     a = getAIdx(x[2])
+    #     if a == 1
+    #         gradPolicy = [1 - exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]]))]
+    #     elseif a == 2
+    #         gradPolicy = [-exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), 1 - exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]]))]
+    #     elseif a == 3
+    #         gradPolicy = [-exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), - exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), 1 - exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]]))]
+    #     elseif a == 4
+    #         gradPolicy = [-exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), -exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]])), 1 - exp(thetas[x[1]][a])/sum(exp.(thetas[x[1]]))]
+    #     else
+    #         throw(error("not a valid action"))
+    #     end
+    #     return gradPolicy
+    # end
+
+
+
+    start = time()
     s = RL.observe(env)
-    a = policy(s)
+    a = policyEps(s)
     r = RL.act!(env, a)
     sp = RL.observe(env)
     hist = [s]
     tau = [(s,a,r)]
-    totR = 0
+    rtogo = 0
     while !RL.terminated(env)
-        ap = policy(sp)
-
+        ap = policyEps(sp)
         s = sp
         a = ap
         r = RL.act!(env, a)
-        totr += r
+        rtogo += r
         sp = RL.observe(env)
         push!(tau, (s,a,r))
         push!(hist, sp)
     end
     # Update Thetas based on trajectory (tau)
+    step = 1
     for x in tau
-        theta = thetas[(x[1])][getindex(RL.actions(env),x[2])]
-        thetas[x[1]][getindex(RL.actions(env),x[2])] = theta + alpha*(totr)/theta
-        totr -= x[3]
+        totGrad = zeros(4)
+        for k in 1:step
+            totGrad += pgFunc(tau[step])
+        end
+        thetas[x[1]] += alpha*(rtogo)*totGrad
+        rtogo -= x[3]
+        step += 1
     end
-    return (hist=hist, theta = copy(theta), time=time()-start)
+    return (hist=hist, thetas = copy(thetas), time=time()-start, policy = policy)
 end
 
 function policyGrad!(env, alpha = 0.2, n_episodes=100)
     episodes = []
-    thetas = Dict((s) => SA{Float64}[0.0,0.0,0.0,0.0] for s in RL.observations(env))
+    thetas = Dict((s) => 420*ones(4) for s in RL.observations(env))
     for i in 1:n_episodes
         RL.reset!(env)
-        tau = policyGrad_episode!(thetas, env)
+        tau = policyGrad_episode!(thetas, env, alpha, max(0.05, 1-i/(n_episodes)))
         push!(episodes, tau)
-        for ele in hist
-
-        end
     end
     
     return episodes
@@ -151,8 +219,9 @@ end
 
 
 
-
-
-
-episodes = Dict("SARSA"=>sarsa_episodes)
+numEps = 50_000
+sarsa_episodes = sarsa!(HW4.gw, n_episodes=numEps)
+policyGrad_episodes = policyGrad!(HW4.gw,0.3,numEps)
+# episodes = Dict("SARSA"=>sarsa_episodes)
+episodes = Dict("SARSA"=>sarsa_episodes, "Policy Gradient"=>policyGrad_episodes)
 plotEnv(HW4.gw,episodes)
