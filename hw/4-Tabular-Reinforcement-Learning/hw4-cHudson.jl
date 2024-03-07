@@ -56,13 +56,7 @@ function sarsa!(env; n_episodes=100)
     
     return episodes
 end
-sarsa_episodes = sarsa!(HW4.gw, n_episodes=100_000);
-
-# @manipulate for episode in 1:length(sarsa_episodes), step in 1:maximum(ep->length(ep.hist), sarsa_episodes)
-#     ep = sarsa_episodes[episode]
-#     i = min(step, length(ep.hist))
-#     POMDPTools.render(m, (s=ep.hist[i],), color=s->maximum(map(a->ep.Q[(s,a)], RL.actions(env))))
-# end
+sarsa_episodes = sarsa!(HW4.gw, n_episodes=10_000);
 
 function evaluate(env, policy, n_episodes=1000, max_steps=1000, gamma=1.0)
     returns = Float64[]
@@ -100,5 +94,65 @@ function plotEnv(env,episodes)
     end
     p
 end
+
+function policyGrad_episode!(thetas,env,alpha,eps=0.1)
+    function policy(s)
+        if rand() < eps
+            return rand(RL.actions(env))
+        else
+            return RL.actions(env)[argmax(thetas[s])]
+        end
+    end
+    function logGradSum(x,totr)
+
+    end
+
+    s = RL.observe(env)
+    a = policy(s)
+    r = RL.act!(env, a)
+    sp = RL.observe(env)
+    hist = [s]
+    tau = [(s,a,r)]
+    totR = 0
+    while !RL.terminated(env)
+        ap = policy(sp)
+
+        s = sp
+        a = ap
+        r = RL.act!(env, a)
+        totr += r
+        sp = RL.observe(env)
+        push!(tau, (s,a,r))
+        push!(hist, sp)
+    end
+    # Update Thetas based on trajectory (tau)
+    for x in tau
+        theta = thetas[(x[1])][getindex(RL.actions(env),x[2])]
+        thetas[x[1]][getindex(RL.actions(env),x[2])] = theta + alpha*(totr)/theta
+        totr -= x[3]
+    end
+    return (hist=hist, theta = copy(theta), time=time()-start)
+end
+
+function policyGrad!(env, alpha = 0.2, n_episodes=100)
+    episodes = []
+    thetas = Dict((s) => SA{Float64}[0.0,0.0,0.0,0.0] for s in RL.observations(env))
+    for i in 1:n_episodes
+        RL.reset!(env)
+        tau = policyGrad_episode!(thetas, env)
+        push!(episodes, tau)
+        for ele in hist
+
+        end
+    end
+    
+    return episodes
+end
+
+
+
+
+
+
 episodes = Dict("SARSA"=>sarsa_episodes)
 plotEnv(HW4.gw,episodes)
