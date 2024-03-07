@@ -11,7 +11,7 @@ import POMDPTools
 # HW4.evaluate("collin.hudson@colorado.edu",time=true)
 
 # Copied from the SARSA Jupyter Notebook
-function sarsa_episode!(Q, env; eps=0.1, gamma=0.99, alpha=0.2)
+function sarsa_episode!(Q, env; eps=0.05, gamma=0.99, alpha=0.2)
     start = time()
     
     function policy(s)
@@ -75,10 +75,9 @@ function evaluate(env, policy, n_episodes=1000, max_steps=1000, gamma=1.0)
     return returns
 end
 
-function plotEnv(env,episodes)
+function plotEnv(env,episodes,stop=50000)
     p = plot(xlabel="steps in environment", ylabel="avg return")
-    n = 20
-    stop = 50000
+    n = 1000
     for (name, eps) in episodes
         if(name == "SARSA")
             Q = Dict((s, a) => 0.0 for s in RL.observations(env), a in RL.actions(env))
@@ -137,6 +136,13 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     function policyEps(s)
         if rand() < eps
             return rand(RL.actions(env))
+            # if(s[2] < 9)
+            #     return RL.actions(env)[3]
+            # elseif (s[1] < 9)
+            #     return RL.actions(env)[1]
+            # else
+            #     return rand(RL.actions(env))
+            # end
         else
             return policy(s,thetas)
         end
@@ -154,7 +160,18 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
             return [0.0,0.0,0.0,1/thetas[x[1]][idx]]
         end
     end
-
+    # function pgFunc(x)
+    #     idx = getAIdx(x[2])
+    #     if(idx == 1)
+    #         return [1/thetas[x[1]][idx],-1/thetas[x[1]][idx],-1/thetas[x[1]][idx],-1/thetas[x[1]][idx]]
+    #     elseif(idx == 2)
+    #         return [-1/thetas[x[1]][idx],1/thetas[x[1]][idx],-1/thetas[x[1]][idx],-1/thetas[x[1]][idx]]
+    #     elseif(idx == 3)
+    #         return [-1/thetas[x[1]][idx],-1/thetas[x[1]][idx],1/thetas[x[1]][idx],-1/thetas[x[1]][idx]]
+    #     elseif(idx == 4)
+    #         return [-1/thetas[x[1]][idx],-1/thetas[x[1]][idx],-1/thetas[x[1]][idx],1/thetas[x[1]][idx]]
+    #     end
+    # end
     # function pgFunc(x)
     #     a = getAIdx(x[2])
     #     if a == 1
@@ -170,9 +187,6 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     #     end
     #     return gradPolicy
     # end
-
-
-
     start = time()
     s = RL.observe(env)
     a = policyEps(s)
@@ -196,7 +210,7 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     for x in tau
         totGrad = zeros(4)
         for k in 1:step
-            totGrad += pgFunc(tau[step])
+            totGrad += pgFunc(tau[k])
         end
         thetas[x[1]] += alpha*(rtogo)*totGrad
         rtogo -= x[3]
@@ -205,12 +219,12 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     return (hist=hist, thetas = copy(thetas), time=time()-start, policy = policy)
 end
 
-function policyGrad!(env, alpha = 0.2, n_episodes=100)
+function policyGrad!(env, alpha = 0.2, eps = 0.05, n_episodes=100)
     episodes = []
     thetas = Dict((s) => 420*ones(4) for s in RL.observations(env))
     for i in 1:n_episodes
         RL.reset!(env)
-        tau = policyGrad_episode!(thetas, env, alpha, max(0.05, 1-i/(n_episodes)))
+        tau = policyGrad_episode!(thetas, env, max(0.1, alpha*(1-i/(n_episodes))), max(eps, 1-i/(n_episodes)))
         push!(episodes, tau)
     end
     
@@ -219,9 +233,10 @@ end
 
 
 
-numEps = 50_000
-sarsa_episodes = sarsa!(HW4.gw, n_episodes=numEps)
-policyGrad_episodes = policyGrad!(HW4.gw,0.3,numEps)
+numEps = 150_000
+# sarsa_episodes = sarsa!(HW4.gw, n_episodes=numEps)
 # episodes = Dict("SARSA"=>sarsa_episodes)
-episodes = Dict("SARSA"=>sarsa_episodes, "Policy Gradient"=>policyGrad_episodes)
-plotEnv(HW4.gw,episodes)
+policyGrad_episodes = policyGrad!(HW4.gw,0.3,0.1,numEps)
+episodes = Dict("Policy Gradient"=>policyGrad_episodes)
+# episodes = Dict("SARSA"=>sarsa_episodes, "Policy Gradient"=>policyGrad_episodes)
+plotEnv(HW4.gw,episodes,numEps)
