@@ -159,15 +159,11 @@ function sampleAction(prob)
 end
 function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     function policy(s,thetas)
-        softMax = exp.(thetas[s])/sum(exp.(thetas[s]))
+        softMax = exp.(thetas[s] .+ eps)/sum(exp.(thetas[s] .+ eps))
         return RL.actions(env)[sampleAction(softMax)]
     end
     function policyEps(s)
-        # if rand() < eps
-        #     return rand(RL.actions(env))
-        # else
             return policy(s,thetas)
-        # end
     end
     
     # function pgFunc(x)
@@ -200,28 +196,34 @@ function policyGrad_episode!(thetas,env,alpha,eps=0.1)
     end
 
     start = time()
-    s = RL.observe(env)
-    a = policyEps(s)
-    r = RL.act!(env, a)
-    sp = RL.observe(env)
-    hist = [s]
-    tau = [(s,a,r)]
-    rtogo = 0
-    while !RL.terminated(env)
-        ap = policyEps(sp)
-        s = sp
-        a = ap
+    hist = []
+    thetasBatch = Dict((s) => zeros(4) for s in RL.observations(env))
+    for batch in 1:1
+        s = RL.observe(env)
+        a = policyEps(s)
         r = RL.act!(env, a)
-        rtogo += r
         sp = RL.observe(env)
-        push!(tau, (s,a,r))
-        push!(hist, sp)
+        # hist = [s]
+        push!(hist, s)
+        tau = [(s,a,r)]
+        rtogo = 0
+        while !RL.terminated(env)
+            ap = policyEps(sp)
+            s = sp
+            a = ap
+            r = RL.act!(env, a)
+            rtogo += r
+            sp = RL.observe(env)
+            push!(tau, (s,a,r))
+            push!(hist, sp)
+        end
+        # Update Thetas based on trajectory (tau)
+        for x in tau
+            thetasBatch[x[1]] += alpha*pgFunc(x)*rtogo/20
+            rtogo -= x[3]
+        end
     end
-    # Update Thetas based on trajectory (tau)
-    for x in tau
-        thetas[x[1]] += alpha*pgFunc(x)*rtogo
-        rtogo -= x[3]
-    end
+    mergewith!(+,thetas,thetasBatch)
     return (hist=hist, thetas = copy(thetas), time=time()-start, policy = policy)
 end
 
