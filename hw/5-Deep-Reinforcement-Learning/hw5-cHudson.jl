@@ -3,79 +3,71 @@ using QuickPOMDPs: QuickPOMDP
 using POMDPTools: Deterministic, Uniform, SparseCat, FunctionPolicy, RolloutSimulator
 using Statistics: mean
 import POMDPs
-
-##############
-# Instructions
-##############
-#=
-
-This starter code is here to show examples of how to use the HW5 code that you
-can copy and paste into your homework code if you wish. It is not meant to be a
-fill-in-the blank skeleton code, so the structure of your final submission may
-differ from this considerably.
-
-=#
-
+# Collin Hudson 3/18/2024 ASEN 5264 Homework 5
 ############
 # Question 1
 ############
 
-# The tiger problem from http://www.sciencedirect.com/science/article/pii/S000437029800023X can be expressed with:
-
-tiger = QuickPOMDP(
-    states = [:TL, :TR],
-    actions = [:OL, :OR, :L],
-    observations = [:TL, :TR],
+dragon = QuickPOMDP(
+    states = [:h, :isc, :ic, :d], #healthy, in-situ-cancer, invasive-cancer, death
+    actions = [:wait, :test, :treat],
+    observations = [:pos, :neg],
 
     # transition should be a function that takes in s and a and returns the distribution of s'
     transition = function (s, a)
-        if a == :L
-            return Deterministic(s)
+        if s == :h
+            return SparseCat([:h, :isc], [0.98, 0.02])
+        elseif s == :isc && a == :treat
+            SparseCat([:h, :isc], [0.60, 0.40])
+        elseif s == :isc && a != :treat
+            SparseCat([:isc, :ic], [0.90, 0.10])
+        elseif s == :ic && a == :treat
+            SparseCat([:h, :d], [0.20, 0.80])
+        elseif s == :ic && a != :treat
+            SparseCat([:ic, :d], [0.40, 0.60])
         else
-            return Uniform([:TL, :TR])
+            return SparseCat([s], [1])
         end
     end,
 
     # observation should be a function that takes in s, a, and sp, and returns the distribution of o
     observation = function (s, a, sp)
-        if a == :L
-            if sp == :TL
-                return SparseCat([:TL, :TR], [0.85, 0.15])
-            else
-                return SparseCat([:TR, :TL], [0.85, 0.15])
+        if a == :test
+            if sp == :h
+                return SparseCat([:pos, :neg], [0.05, 0.95])
+            elseif sp == :isc
+                return SparseCat([:pos, :neg], [0.80, 0.20])
+            elseif sp == :ic
+                return SparseCat([:pos], [1])
             end
+        elseif a == :treat && (sp == :isc || sp == :ic)
+            return SparseCat([:pos], [1])
         else
-            return Uniform([:TL, :TR])
+            return SparseCat([:neg], [1])
         end
     end,
 
     reward = function (s, a)
-        if a == :L
-            return -1.0
-        elseif a == :OL
-            if s == :TR
-                return 10.0
-            else
-                return -100.0
-            end
-        else # a = :OR
-            if s == :TL
-                return 10.0
-            else
-                return -100.0
-            end
+        if s == :d
+            return 0.0
+        elseif :a == wait
+            return 1.0
+        elseif :a == test
+            return 0.8
+        elseif :a == treat
+            return 0.1
         end
     end,
 
-    initialstate = Uniform([:TL, :TR]),
+    initialstate = :h,
 
-    discount = 0.95
+    discount = 0.99
 )
 
 # evaluate with a random policy
-policy = FunctionPolicy(o->rand(POMDPs.actions(tiger)))
+policy = FunctionPolicy(o->return :wait)
 sim = RolloutSimulator(max_steps=100)
-@show @time mean(POMDPs.simulate(sim, tiger, policy) for _ in 1:10_000)
+# @show @time mean(POMDPs.simulate(sim, tiger, policy) for _ in 1:10_000)
 
 ############
 # Question 2
