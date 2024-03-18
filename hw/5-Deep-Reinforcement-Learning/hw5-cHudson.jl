@@ -1,7 +1,10 @@
 using DMUStudent.HW5: HW5, mc
+using Plots: scatter, scatter!, plot, plot!
 using QuickPOMDPs: QuickPOMDP
+using StaticArrays: SA, SVector
 using POMDPTools: Deterministic, Uniform, SparseCat, FunctionPolicy, RolloutSimulator
 using Statistics: mean
+using Flux
 import POMDPs
 # Collin Hudson 3/18/2024 ASEN 5264 Homework 5
 ############
@@ -79,7 +82,21 @@ sim = RolloutSimulator(max_steps=100)
 ############
 
 # The notebook at https://github.com/zsunberg/CU-DMU-Materials/blob/master/notebooks/110-Neural-Networks.ipynb can serve as a starting point for this problem.
-
+n = 100
+dx = rand(n)
+dy = (1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n);
+display(scatter(dx, dy))
+m = Chain(Dense(1=>50,sigmoid_fast), Dense(50=>100,sigmoid_fast), Dense(100=>50,sigmoid_fast), Dense(50=>1))
+# loss(x, y) = Flux.mse(m(x), y)
+loss(x, y) = sum((m(x)-y).^2)
+data = [(SVector(dx[i]), SVector(dy[i])) for i in 1:length(dx)]
+for i in 1:2000
+    Flux.train!(loss, Flux.params(m), data, RMSProp(0.01))
+end
+p = plot(sort(dx), x->((1 - x)*sin.(20 * log(x + 0.2))), label="(1-x)*sin(20*log(x + 0.2))")
+plot!(p, sort(dx), first.(m.(SVector.(sort(dx)))), label="NN approximation")
+scatter!(p, dx, dy, label="data")
+display(p)
 ############
 # Question 3
 ############
