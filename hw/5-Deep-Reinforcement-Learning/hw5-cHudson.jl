@@ -50,24 +50,29 @@ dragon = QuickPOMDP(
     reward = function (s, a)
         if s == :d
             return 0.0
-        elseif :a == wait
+        elseif a == :wait
             return 1.0
-        elseif :a == test
+        elseif a == :test
             return 0.8
-        elseif :a == treat
+        elseif a == :treat
             return 0.1
+        else
+            return 0.0
         end
     end,
 
-    initialstate = :h,
+    initialstate = SparseCat([:h], [1]),
 
     discount = 0.99
 )
 
 # evaluate with a random policy
-policy = FunctionPolicy(o->return :wait)
+function justWait(s)
+    return :wait
+end
+policy = FunctionPolicy(o->justWait(o))
 sim = RolloutSimulator(max_steps=100)
-# @show @time mean(POMDPs.simulate(sim, tiger, policy) for _ in 1:10_000)
+@show @time mean(POMDPs.simulate(sim, dragon, policy) for _ in 1:10_000)
 
 ############
 # Question 2
@@ -78,7 +83,7 @@ sim = RolloutSimulator(max_steps=100)
 ############
 # Question 3
 ############
-
+#=
 using CommonRLInterface
 using Flux
 using CommonRLInterface.Wrappers: QuickWrapper
@@ -161,3 +166,4 @@ heatmap(xs, vs, (x, v) -> maximum(Q([x, v])), xlabel="Position (x)", ylabel="Vel
 # end
 # 
 # display(render_value(s->maximum(Q(s))))
+=#
