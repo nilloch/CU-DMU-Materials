@@ -10,106 +10,107 @@ import POMDPs
 ############
 # Question 1
 ############
+#=(
+    dragon = QuickPOMDP(
+        states = [:h, :isc, :ic, :d], #healthy, in-situ-cancer, invasive-cancer, death
+        actions = [:wait, :test, :treat],
+        observations = [:pos, :neg],
 
-dragon = QuickPOMDP(
-    states = [:h, :isc, :ic, :d], #healthy, in-situ-cancer, invasive-cancer, death
-    actions = [:wait, :test, :treat],
-    observations = [:pos, :neg],
-
-    # transition should be a function that takes in s and a and returns the distribution of s'
-    transition = function (s, a)
-        if s == :h
-            return SparseCat([:h, :isc], [0.98, 0.02])
-        elseif s == :isc && a == :treat
-            SparseCat([:h, :isc], [0.60, 0.40])
-        elseif s == :isc && a != :treat
-            SparseCat([:isc, :ic], [0.90, 0.10])
-        elseif s == :ic && a == :treat
-            SparseCat([:h, :d], [0.20, 0.80])
-        elseif s == :ic && a != :treat
-            SparseCat([:ic, :d], [0.40, 0.60])
-        else
-            return SparseCat([s], [1])
-        end
-    end,
-
-    # observation should be a function that takes in s, a, and sp, and returns the distribution of o
-    observation = function (s, a, sp)
-        if a == :test
-            if sp == :h
-                return SparseCat([:pos, :neg], [0.05, 0.95])
-            elseif sp == :isc
-                return SparseCat([:pos, :neg], [0.80, 0.20])
-            elseif sp == :ic
-                return SparseCat([:pos], [1])
+        # transition should be a function that takes in s and a and returns the distribution of s'
+        transition = function (s, a)
+            if s == :h
+                return SparseCat([:h, :isc], [0.98, 0.02])
+            elseif s == :isc && a == :treat
+                SparseCat([:h, :isc], [0.60, 0.40])
+            elseif s == :isc && a != :treat
+                SparseCat([:isc, :ic], [0.90, 0.10])
+            elseif s == :ic && a == :treat
+                SparseCat([:h, :d], [0.20, 0.80])
+            elseif s == :ic && a != :treat
+                SparseCat([:ic, :d], [0.40, 0.60])
+            else
+                return SparseCat([s], [1])
             end
-        elseif a == :treat && (sp == :isc || sp == :ic)
-            return SparseCat([:pos], [1])
-        else
-            return SparseCat([:neg], [1])
-        end
-    end,
+        end,
 
-    reward = function (s, a)
-        if s == :d
-            return 0.0
-        elseif a == :wait
-            return 1.0
-        elseif a == :test
-            return 0.8
-        elseif a == :treat
-            return 0.1
-        else
-            return 0.0
-        end
-    end,
+        # observation should be a function that takes in s, a, and sp, and returns the distribution of o
+        observation = function (s, a, sp)
+            if a == :test
+                if sp == :h
+                    return SparseCat([:pos, :neg], [0.05, 0.95])
+                elseif sp == :isc
+                    return SparseCat([:pos, :neg], [0.80, 0.20])
+                elseif sp == :ic
+                    return SparseCat([:pos], [1])
+                end
+            elseif a == :treat && (sp == :isc || sp == :ic)
+                return SparseCat([:pos], [1])
+            else
+                return SparseCat([:neg], [1])
+            end
+        end,
 
-    initialstate = SparseCat([:h], [1]),
+        reward = function (s, a)
+            if s == :d
+                return 0.0
+            elseif a == :wait
+                return 1.0
+            elseif a == :test
+                return 0.8
+            elseif a == :treat
+                return 0.1
+            else
+                return 0.0
+            end
+        end,
 
-    discount = 0.99
-)
+        initialstate = SparseCat([:h], [1]),
 
-# evaluate with a random policy
-function justWait(s)
-    return :wait
-end
-policy = FunctionPolicy(o->justWait(o))
-sim = RolloutSimulator(max_steps=100)
-@show @time mean(POMDPs.simulate(sim, dragon, policy) for _ in 1:10_000)
+        discount = 0.99
+    )
 
-############
-# Question 2
-############
+    # evaluate with a random policy
+    function justWait(s)
+        return :wait
+    end
+    policy = FunctionPolicy(o->justWait(o))
+    sim = RolloutSimulator(max_steps=100)
+    @show @time mean(POMDPs.simulate(sim, dragon, policy) for _ in 1:10_000)
 
-# The notebook at https://github.com/zsunberg/CU-DMU-Materials/blob/master/notebooks/110-Neural-Networks.ipynb can serve as a starting point for this problem.
-n = 100
-dx = rand(n)
-dy = (1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n);
-# display(scatter(dx, dy))
-sz = 128
-# m = Chain(Dense(1=>sz,sigmoid), Dense(sz=>sz,sigmoid), Dense(sz=>1))
-m = Chain(Dense(1=>50,sigmoid_fast), Dense(50=>100,sigmoid_fast), Dense(100=>50,sigmoid_fast), Dense(50=>1))
-loss(x, y) = Flux.mse(m(x), y)
-# loss(x, y) = sum((m(x)-y).^2)
-data = [(SVector(dx[i]), SVector(dy[i])) for i in 1:length(dx)]
-ploss = plot(label="loss")
-is = Vector{Int}()
-ys = Vector{Float64}()
-for i in 1:8000
-    Flux.train!(loss, Flux.params(m), data, RMSProp(0.01))
-    push!(ys,mean(loss.(SVector.(dx),SVector.(dy))))
-    push!(is,i)
-end
-scatter!(ploss,is,ys,label="")
-p = plot(sort(dx), x->((1 - x)*sin.(20 * log(x + 0.2))), label="(1-x)*sin(20*log(x + 0.2))")
-plot!(p, sort(dx), first.(m.(SVector.(sort(dx)))), label="NN approximation")
-scatter!(p, dx, dy, label="data")
-display(p)
-display(ploss)
+    ############
+    # Question 2
+    ############
+
+    # The notebook at https://github.com/zsunberg/CU-DMU-Materials/blob/master/notebooks/110-Neural-Networks.ipynb can serve as a starting point for this problem.
+    n = 100
+    dx = rand(n)
+    dy = (1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n);
+    # display(scatter(dx, dy))
+    sz = 128
+    # m = Chain(Dense(1=>sz,sigmoid), Dense(sz=>sz,sigmoid), Dense(sz=>1))
+    m = Chain(Dense(1=>100,sigmoid_fast), Dense(100=>100,sigmoid_fast), Dense(100=>100,sigmoid_fast), Dense(100=>1))
+    loss(x, y) = Flux.mse(m(x), y)
+    # loss(x, y) = sum((m(x)-y).^2)
+    data = [(SVector(dx[i]), SVector(dy[i])) for i in 1:length(dx)]
+    ploss = plot(label="loss")
+    is = Vector{Int}()
+    ys = Vector{Float64}()
+    for i in 1:8000
+        Flux.train!(loss, Flux.params(m), data, RMSProp(0.01))
+        push!(ys,mean(loss.(SVector.(dx),SVector.(dy))))
+        push!(is,i)
+    end
+    scatter!(ploss,is,ys,label="")
+    p = plot(sort(dx), x->((1 - x)*sin.(20 * log(x + 0.2))), label="(1-x)*sin(20*log(x + 0.2))")
+    plot!(p, sort(dx), first.(m.(SVector.(sort(dx)))), label="NN approximation")
+    scatter!(p, dx, dy, label="data")
+    display(p)
+    display(ploss)
+)=#
 ############
 # Question 3
 ############
-#=
+
 using CommonRLInterface
 using Flux
 using CommonRLInterface.Wrappers: QuickWrapper
@@ -129,8 +130,6 @@ function dqn(env)
     # This network should work for the Q function - an input is a state; the output is a vector containing the Q-values for each action 
     Q = Chain(Dense(2, 128, relu),
               Dense(128, length(actions(env))))
-
-    # We can create 1 tuple of experience like this
     s = observe(env)
     a_ind = 1 # action index - the index, rather than the actual action itself, will be needed in the loss function
     r = act!(env, actions(env)[a_ind])
@@ -141,20 +140,38 @@ function dqn(env)
 
     # this container should work well for the experience buffer:
     buffer = [experience_tuple]
-    # you will need to push more experience into it and randomly select data for training
+    epochs = 1000
+    for j in 1:epochs
+        # We can create 1 tuple of experience like this
+        s = observe(env)
+        a_ind = argmax(a->Q(s)[a],actions(env)) # action index - the index, rather than the actual action itself, will be needed in the loss function
+        r = act!(env, actions(env)[a_ind])
+        sp = observe(env)
+        done = terminated(env)
 
-    # create your loss function for Q training here
-    function loss(Q, s, a_ind, r, sp, done)
-        return (r-Q(s)[a_2])^ind # this is not correct! you need to replace it with the true Q-learning loss function
-        # make sure to take care of cases when the problem has terminated correctly
+        experience_tuple = (s, a_ind, r, sp, done)
+
+        # this container should work well for the experience buffer:
+        push!(buffer,experience_tuple)
+        # you will need to push more experience into it and randomly select data for training
+
+        # create your loss function for Q training here
+        function loss(Q, s, a_ind, r, sp, done)
+            gamma = 0.99
+            if !done
+                return (r + gamma*findmax(Q(sp))[1] - Q(s)[a_ind])^2
+            else
+                return (Q(sp)[1] - Q(s)[a_ind])^2
+            end
+        end
+
+        # select some data from the buffer
+        batchSize = 10
+        data = rand(buffer, batchSize)
+
+        # do your training like this (you may have to adjust some things, and you will have to do this many times):
+        Flux.Optimise.train!(loss, Q, data, Flux.setup(ADAM(0.0005), Q))
     end
-
-    # select some data from the buffer
-    data = rand(buffer, 10)
-
-    # do your training like this (you may have to adjust some things, and you will have to do this many times):
-    Flux.Optimise.train!(loss, Q, data, Flux.setup(ADAM(0.0005), Q))
-
     # Make sure to evaluate, print, and plot often! You will want to save your best policy.
     
     return Q
@@ -167,7 +184,7 @@ HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))], n_episodes=100) # you will need
 #----------
 # Rendering
 #----------
-
+#=
 # You can show an image of the environment like this (use ElectronDisplay if running from REPL):
 display(render(env))
 
