@@ -85,18 +85,27 @@ sim = RolloutSimulator(max_steps=100)
 n = 100
 dx = rand(n)
 dy = (1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n);
-display(scatter(dx, dy))
+# display(scatter(dx, dy))
+sz = 128
+# m = Chain(Dense(1=>sz,sigmoid), Dense(sz=>sz,sigmoid), Dense(sz=>1))
 m = Chain(Dense(1=>50,sigmoid_fast), Dense(50=>100,sigmoid_fast), Dense(100=>50,sigmoid_fast), Dense(50=>1))
-# loss(x, y) = Flux.mse(m(x), y)
-loss(x, y) = sum((m(x)-y).^2)
+loss(x, y) = Flux.mse(m(x), y)
+# loss(x, y) = sum((m(x)-y).^2)
 data = [(SVector(dx[i]), SVector(dy[i])) for i in 1:length(dx)]
-for i in 1:2000
+ploss = plot(label="loss")
+is = Vector{Int}()
+ys = Vector{Float64}()
+for i in 1:8000
     Flux.train!(loss, Flux.params(m), data, RMSProp(0.01))
+    push!(ys,mean(loss.(SVector.(dx),SVector.(dy))))
+    push!(is,i)
 end
+scatter!(ploss,is,ys,label="")
 p = plot(sort(dx), x->((1 - x)*sin.(20 * log(x + 0.2))), label="(1-x)*sin(20*log(x + 0.2))")
 plot!(p, sort(dx), first.(m.(SVector.(sort(dx)))), label="NN approximation")
 scatter!(p, dx, dy, label="data")
 display(p)
+display(ploss)
 ############
 # Question 3
 ############
