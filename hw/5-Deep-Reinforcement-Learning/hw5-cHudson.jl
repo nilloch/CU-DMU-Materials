@@ -135,7 +135,7 @@ function dqn(env)
     opt = Flux.setup(ADAM(0.0005), Q)
     bestEval = 0
     steps = 100
-    intensity = 10
+    intensity = 15
     episodes = 1000
     gamma = 0.99
     eps = 0.5
@@ -154,9 +154,9 @@ function dqn(env)
     # create your loss function for Q training here
     epSteps = 0
     for k in 1:episodes
-        if(!isempty(rewardTot) && last(rewardTot) > 20)
-            deleteat!(buffer,(length(buffer) - epSteps):length(buffer))
-        end
+        # if(!isempty(rewardTot) && last(rewardTot) > 20)
+        #     deleteat!(buffer,(length(buffer) - epSteps):length(buffer))
+        # end
         if k%10 == 0
             @show k
             Qp = deepcopy(Q)
@@ -198,9 +198,15 @@ function dqn(env)
         # push!(lossMean,tot/batchSize)
         reset!(env)
         if k%10 == 0
-            evalVal = HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))],n_episodes=100)[1]
+            evalVal = HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))],n_episodes=250)[1]
+            @show evalVal
+            @show bestEval
             push!(rewardTot,evalVal)
             if evalVal > bestEval
+                if evalVal >= 40
+                    HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))],"collin.hudson@colorado.edu")
+                end
+                @show "copying Q->Qbest"
                 Qbest = deepcopy(Q)
                 bestEval = evalVal
             end
