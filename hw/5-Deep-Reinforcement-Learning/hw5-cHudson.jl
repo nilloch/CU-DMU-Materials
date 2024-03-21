@@ -83,8 +83,8 @@ import POMDPs
 
     # The notebook at https://github.com/zsunberg/CU-DMU-Materials/blob/master/notebooks/110-Neural-Networks.ipynb can serve as a starting point for this problem.
     n = 100
-    dx = rand(n)
-    dy = (1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n);
+    dx = convert.(Float32,rand(n))
+    dy = convert.(Float32,(1 .- dx).*sin.(20 .* log.(dx .+ 0.2)) + 0.1*randn(n));
     # display(scatter(dx, dy))
     sz = 128
     # m = Chain(Dense(1=>sz,sigmoid), Dense(sz=>sz,sigmoid), Dense(sz=>1))
@@ -127,59 +127,81 @@ env = QuickWrapper(HW5.mc,
                   )
 
 function dqn(env)
-    # This network should work for the Q function - an input is a state; the output is a vector containing the Q-values for each action 
     Q = Chain(Dense(2, 128, relu),
               Dense(128, length(actions(env))))
+    Qp = deepcopy(Q)
+    opt = Flux.setup(ADAM(0.0005), Q)
+    steps = 100
+    episodes = 1000
+    eps = 0.5
+    reset!(env) 
     s = observe(env)
-    a_ind = 1 # action index - the index, rather than the actual action itself, will be needed in the loss function
+    a_ind = rand(eachindex(actions(env)))
     r = act!(env, actions(env)[a_ind])
     sp = observe(env)
     done = terminated(env)
-
     experience_tuple = (s, a_ind, r, sp, done)
-
-    # this container should work well for the experience buffer:
     buffer = [experience_tuple]
-    epochs = 1000
-    for j in 1:epochs
-        # We can create 1 tuple of experience like this
-        s = observe(env)
-        a_ind = argmax(a->Q(s)[a],actions(env)) # action index - the index, rather than the actual action itself, will be needed in the loss function
-        r = act!(env, actions(env)[a_ind])
-        sp = observe(env)
-        done = terminated(env)
-
-        experience_tuple = (s, a_ind, r, sp, done)
-
-        # this container should work well for the experience buffer:
-        push!(buffer,experience_tuple)
-        # you will need to push more experience into it and randomly select data for training
-
-        # create your loss function for Q training here
-        function loss(Q, s, a_ind, r, sp, done)
-            gamma = 0.99
-            if !done
-                return (r + gamma*findmax(Q(sp))[1] - Q(s)[a_ind])^2
-            else
-                return (Q(sp)[1] - Q(s)[a_ind])^2
-            end
+    # ep2delLen = 1
+    # toDel = false
+    j = 1
+    for k in 1:episodes
+        # if toDel
+        #     ep2delLen = j
+        #     toDel = false
+        # end
+        if(k%50 == 0)
+            @show k
+            # deleteat!(buffer,1:ep2delLen)
+            # toDel = true
         end
+        j = 1
+        reset!(env)
+        while j < steps && !done
+            s = observe(env)
+            if rand() <  max(eps/10, eps*(1-(j*k/100000)))
+                a_ind = rand(eachindex(actions(env)))
+            else
+                a_ind = argmax(a->Q(s)[a],eachindex(actions(env)))
+            end
+            r = act!(env, actions(env)[a_ind])
+            sp = observe(env)
+            done = terminated(env)
 
-        # select some data from the buffer
-        batchSize = 10
-        data = rand(buffer, batchSize)
+            experience_tuple = (s, a_ind, r, sp, done)
 
-        # do your training like this (you may have to adjust some things, and you will have to do this many times):
-        Flux.Optimise.train!(loss, Q, data, Flux.setup(ADAM(0.0005), Q))
+            # this container should work well for the experience buffer:
+            push!(buffer,experience_tuple)
+            # create your loss function for Q training here
+            function loss(Q, s, a_ind, r, sp, done)
+                gamma = 0.99
+                if !done
+                    return (r + gamma*maximum(Qp(sp)) - Q(s)[a_ind])^2
+                else
+                    return 0
+                end
+            end
+
+            # select some data from the buffer
+            # batchSize = min(10,length(buffer))
+            batchSize = 1000
+            data = rand(buffer, batchSize)
+            if((j*k)%1000 == 0)
+                Qp = deepcopy(Q)
+            end
+
+            # do your training like this (you may have to adjust some things, and you will have to do this many times):
+            Flux.Optimise.train!(loss, Q, data, opt)
+            j += 1
+        end
+        # Make sure to evaluate, print, and plot often! You will want to save your best policy.
     end
-    # Make sure to evaluate, print, and plot often! You will want to save your best policy.
-    
     return Q
 end
 
 Q = dqn(env)
 
-HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))], n_episodes=100) # you will need to remove the n_episodes=100 keyword argument to create a json file; evaluate needs to run 10_000 episodes to produce a json
+HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))]) # you will need to remove the n_episodes=100 keyword argument to create a json file; evaluate needs to run 10_000 episodes to produce a json
 
 #----------
 # Rendering
