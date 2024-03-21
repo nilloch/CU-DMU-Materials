@@ -127,6 +127,7 @@ env = QuickWrapper(HW5.mc,
                   )
 
 function dqn(env)
+    #Training Parameters
     Q = Chain(Dense(2, 128, relu),
               Dense(128, length(actions(env))))
     Qp = deepcopy(Q)
@@ -135,6 +136,7 @@ function dqn(env)
     intensity = 10
     episodes = 1000
     eps = 0.5
+    #Make buffer
     reset!(env) 
     s = observe(env)
     a_ind = rand(eachindex(actions(env)))
@@ -143,24 +145,28 @@ function dqn(env)
     done = terminated(env)
     experience_tuple = (s, a_ind, r, sp, done)
     buffer = [experience_tuple]
-    # ep2delLen = 1
-    # toDel = false
-    j = 1
+    lossMean = Vector{Float64}()
+    rewardTot = Vector{Float64}()
+    # create your loss function for Q training here
+    function loss(Q, s, a_ind, r, sp, done)
+        gamma = 0.99
+        if !done
+            return (r + gamma*maximum(Qp(sp)) - Q(s)[a_ind])^2
+        else
+            return 0
+        end
+    end
     for k in 1:episodes
-        # if toDel
-        #     ep2delLen = j
-        #     toDel = false
-        # end
-        # if(k%50 == 0)
+        if k%10 == 0
             @show k
-            # deleteat!(buffer,1:ep2delLen)
-            # toDel = true
-        # end
+            Qp = deepcopy(Q)
+            deleteat!(buffer,1:400)
+        end
         j = 1
         reset!(env)
         while j < steps && !done
             s = observe(env)
-            if rand() <  max(eps/10, eps*(1-(j*k/100000)))
+            if rand() <  max(eps/10, eps*(1-((k*steps + j)/100000)))
                 a_ind = rand(eachindex(actions(env)))
             else
                 a_ind = argmax(a->Q(s)[a],eachindex(actions(env)))
@@ -168,41 +174,34 @@ function dqn(env)
             r = act!(env, actions(env)[a_ind])
             sp = observe(env)
             done = terminated(env)
-
             experience_tuple = (s, a_ind, r, sp, done)
-
-            # this container should work well for the experience buffer:
             push!(buffer,experience_tuple)
-            # create your loss function for Q training here
-            function loss(Q, s, a_ind, r, sp, done)
-                gamma = 0.99
-                if !done
-                    return (r + gamma*maximum(Qp(sp)) - Q(s)[a_ind])^2
-                else
-                    return 0
-                end
-            end
-
-            # select some data from the buffer
-            # batchSize = min(10,length(buffer))
-            batchSize = intensity*steps
-            data = rand(buffer, batchSize)
-            if((j*k)%1000 == 0)
-                Qp = deepcopy(Q)
-            end
-
-            # do your training like this (you may have to adjust some things, and you will have to do this many times):
-            Flux.Optimise.train!(loss, Q, data, opt)
             j += 1
         end
-        # Make sure to evaluate, print, and plot often! You will want to save your best policy.
+        batchSize = intensity*steps
+        data = rand(buffer, batchSize)
+        Flux.Optimise.train!(loss, Q, data, opt)
+        tot = 0
+        totr = 0
+        for exp in data
+            tot += loss(Q,exp[1],exp[2],exp[3],exp[4],exp[5])
+            totr += exp[3]
+        end
+        push!(lossMean,tot/batchSize)
+        push!(rewardTot,totr)
     end
+    ploss3 = plot(label="P3 loss per episode")
+    plot!(ploss3, 1:episodes, lossMean,label="mean loss per episode")
+    display(ploss3)
+    rew = plot(label="rewards")
+    plot!(rew, 1:episodes, rewardTot, label="total reward per episode")
+    display(rew)
     return Q
 end
 
 Q = dqn(env)
 
-HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))]) # you will need to remove the n_episodes=100 keyword argument to create a json file; evaluate needs to run 10_000 episodes to produce a json
+HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))],"collin.hudson@colorado.edu") # you will need to remove the n_episodes=100 keyword argument to create a json file; evaluate needs to run 10_000 episodes to produce a json
 
 #----------
 # Rendering
