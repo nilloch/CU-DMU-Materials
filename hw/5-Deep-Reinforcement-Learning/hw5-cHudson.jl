@@ -132,6 +132,7 @@ function dqn(env)
     Qp = deepcopy(Q)
     opt = Flux.setup(ADAM(0.0005), Q)
     steps = 100
+    intensity = 10
     episodes = 1000
     eps = 0.5
     reset!(env) 
@@ -150,11 +151,11 @@ function dqn(env)
         #     ep2delLen = j
         #     toDel = false
         # end
-        if(k%50 == 0)
+        # if(k%50 == 0)
             @show k
             # deleteat!(buffer,1:ep2delLen)
             # toDel = true
-        end
+        # end
         j = 1
         reset!(env)
         while j < steps && !done
@@ -184,7 +185,7 @@ function dqn(env)
 
             # select some data from the buffer
             # batchSize = min(10,length(buffer))
-            batchSize = 1000
+            batchSize = intensity*steps
             data = rand(buffer, batchSize)
             if((j*k)%1000 == 0)
                 Qp = deepcopy(Q)
