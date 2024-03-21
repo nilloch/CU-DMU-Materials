@@ -131,10 +131,13 @@ function dqn(env)
     Q = Chain(Dense(2, 128, relu),
               Dense(128, length(actions(env))))
     Qp = deepcopy(Q)
+    Qbest = deepcopy(Q)
     opt = Flux.setup(ADAM(0.0005), Q)
+    bestEval = 0
     steps = 100
     intensity = 10
     episodes = 1000
+    gamma = 0.99
     eps = 0.5
     #Make buffer
     reset!(env) 
@@ -145,22 +148,27 @@ function dqn(env)
     done = terminated(env)
     experience_tuple = (s, a_ind, r, sp, done)
     buffer = [experience_tuple]
-    lossMean = Vector{Float64}()
+    # lossMean = Vector{Float64}()
     rewardTot = Vector{Float64}()
+    rewardMean = Vector{Float64}()
     # create your loss function for Q training here
-    function loss(Q, s, a_ind, r, sp, done)
-        gamma = 0.99
-        if !done
-            return (r + gamma*maximum(Qp(sp)) - Q(s)[a_ind])^2
-        else
-            return 0
-        end
-    end
+    epSteps = 0
     for k in 1:episodes
+        if(!isempty(rewardTot) && last(rewardTot) > 20)
+            deleteat!(buffer,(length(buffer) - epSteps):length(buffer))
+        end
         if k%10 == 0
             @show k
             Qp = deepcopy(Q)
-            deleteat!(buffer,1:400)
+            # deleteat!(buffer,1:200)
+        end
+        function loss(Q, s, a_ind, r, sp, done)
+            if !done
+                return (r + gamma*maximum(Qp(sp)) - Q(s)[a_ind])^2
+            else
+                return (r - Q(s)[a_ind])^2
+                # return 0
+            end
         end
         j = 1
         reset!(env)
@@ -171,7 +179,7 @@ function dqn(env)
             else
                 a_ind = argmax(a->Q(s)[a],eachindex(actions(env)))
             end
-            r = act!(env, actions(env)[a_ind])
+            r = gamma^j*act!(env, actions(env)[a_ind])
             sp = observe(env)
             done = terminated(env)
             experience_tuple = (s, a_ind, r, sp, done)
@@ -181,22 +189,43 @@ function dqn(env)
         batchSize = intensity*steps
         data = rand(buffer, batchSize)
         Flux.Optimise.train!(loss, Q, data, opt)
-        tot = 0
-        totr = 0
-        for exp in data
-            tot += loss(Q,exp[1],exp[2],exp[3],exp[4],exp[5])
-            totr += exp[3]
+        # tot = 0
+        # totr = 0
+        # for exp in data
+        #     tot += loss(Q,exp[1],exp[2],exp[3],exp[4],exp[5])
+        #     # totr += exp[3]
+        # end
+        # push!(lossMean,tot/batchSize)
+        reset!(env)
+        if k%10 == 0
+            evalVal = HW5.evaluate(s->actions(env)[argmax(Q(s[1:2]))],n_episodes=100)[1]
+            push!(rewardTot,evalVal)
+            if evalVal > bestEval
+                Qbest = deepcopy(Q)
+                bestEval = evalVal
+            end
         end
-        push!(lossMean,tot/batchSize)
-        push!(rewardTot,totr)
+        epSteps = j;
     end
-    ploss3 = plot(label="P3 loss per episode")
-    plot!(ploss3, 1:episodes, lossMean,label="mean loss per episode")
-    display(ploss3)
+    # ploss3 = plot(label="P3 loss per episode")
+    # plot!(ploss3, 1:episodes, lossMean,label="mean loss per episode")
+    # display(ploss3)
     rew = plot(label="rewards")
-    plot!(rew, 1:episodes, rewardTot, label="total reward per episode")
+    # avrew = plot(label="avrew")
+    # nPts = 1
+    # for idx in eachindex(rewardTot)
+    #     if idx%10 == 0
+    #         push!(rewardMean,mean(rewardTot[idx-9:idx]))
+    #         nPts += 1
+    #     end
+    # end
+    # plot!(rew, 1:nPts, rewardMean, label="eval score per episode")
+    plot!(rew, rewardTot, label="eval score per episode")
     display(rew)
-    return Q
+    # plot!(avrew, rewardMean, label="average reward")
+    # display(avrew)
+
+    return Qbest
 end
 
 Q = dqn(env)
@@ -216,19 +245,18 @@ xs = -3.0f0:0.1f0:3.0f0
 vs = -0.3f0:0.01f0:0.3f0
 heatmap(xs, vs, (x, v) -> maximum(Q([x, v])), xlabel="Position (x)", ylabel="Velocity (v)", title="Max Q Value")
 
-
+=#
 # function render_value(value)
 #     xs = -3.0:0.1:3.0
 #     vs = -0.3:0.01:0.3
-# 
+
 #     data = DataFrame(
 #                      x = vec([x for x in xs, v in vs]),
 #                      v = vec([v for x in xs, v in vs]),
 #                      val = vec([value([x, v]) for x in xs, v in vs])
 #     )
-# 
+
 #     data |> @vlplot(:rect, "x:o", "v:o", color=:val, width="container", height="container")
 # end
-# 
+
 # display(render_value(s->maximum(Q(s))))
-=#
