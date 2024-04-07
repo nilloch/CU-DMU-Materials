@@ -10,7 +10,7 @@ import POMDPs
 ############
 # Question 1
 ############
-#=(
+
     dragon = QuickPOMDP(
         states = [:h, :isc, :ic, :d], #healthy, in-situ-cancer, invasive-cancer, death
         actions = [:wait, :test, :treat],
@@ -95,7 +95,7 @@ import POMDPs
     ploss = plot(label="loss")
     is = Vector{Int}()
     ys = Vector{Float64}()
-    for i in 1:8000
+    for i in 1:2000
         Flux.train!(loss, Flux.params(m), data, RMSProp(0.01))
         push!(ys,mean(loss.(SVector.(dx),SVector.(dy))))
         push!(is,i)
@@ -106,7 +106,7 @@ import POMDPs
     scatter!(p, dx, dy, label="data")
     display(p)
     display(ploss)
-)=#
+
 ############
 # Question 3
 ############
@@ -135,7 +135,7 @@ function dqn(env)
     opt = Flux.setup(ADAM(0.0005), Q)
     bestEval = 0
     steps = 100
-    intensity = 15
+    intensity = 10
     episodes = 1000
     gamma = 0.99
     eps = 0.5
