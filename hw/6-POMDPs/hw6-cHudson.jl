@@ -39,7 +39,7 @@ function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
         idxSp += 1
     end
     # Normalize belief vector
-    bp_vec = bp_vec./sum(bp_vec)
+    bp_vec ./= sum(bp_vec)
     return DiscreteBelief(up.m, bp_vec)
 end
 # POMDPs.transtion and POMDPs.observation return distribution objects. See the POMDPs.jl documentation for more details.
@@ -68,7 +68,7 @@ end
 
 function POMDPs.action(p::HW6AlphaVectorPolicy, b::DiscreteBelief)
     # choose action based on alpha vectors
-    return p.alpha_actions(argmax(idx->(p.alphas(idx)'*b.b)))
+    return p.alpha_actions[argmax(idx->(p.alphas[idx]'*b.b),eachindex(p.alphas))]
 end
 
 #------
@@ -91,8 +91,9 @@ function value_iteration(m,discount,sprc)
         end
         Vprime[:] = maximum(temp, dims=2)
     end
+    #Calculate Q (by replacing R)
     for key in keys(R)
-        R[key] = R[key] + discount*V
+        R[key] = R[key] + discount*T[key]'*V
     end
     return R
 end
@@ -101,16 +102,12 @@ function qmdp_solve(m, discount=discount(m))
 
     # Fill in Value Iteration to compute the Q-values
     Q = value_iteration(m,discount,true)
-
+    @show Q
     acts = actiontype(m)[]
     alphas = Vector{Float64}[]
     for a in ordered_actions(m)
         push!(acts,a)
-        # @show typeof(Q[a])
-        # @show typeof(alphas)
         push!(alphas,Q[a])
-        # Fill in alpha vector calculation
-        # Note that the ordering of the entries in the alpha vectors must be consistent with stateindex(m, s) (states(m) does not necessarily obey this order, but ordered_states(m) does.)
     end
     return HW6AlphaVectorPolicy(alphas, acts)
 end
@@ -124,6 +121,8 @@ up = HW6Updater(m)
 
 @show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
 @show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
+
+# PLOT ALPHA VECTORS!!!!!!!
 
 ###################
 # Problem 2: Cancer
