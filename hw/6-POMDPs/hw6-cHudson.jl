@@ -5,7 +5,7 @@ using QuickPOMDPs: QuickPOMDP
 using POMDPModels: TigerPOMDP
 using NativeSARSOP: SARSOPSolver
 using POMDPTesting: has_consistent_distributions
-
+# Collin Hudson 4/7/2024 Homework 6
 ##################
 # Problem 1: Tiger
 ##################
@@ -20,12 +20,10 @@ struct HW6Updater{M<:POMDP} <: Updater
 end
 
 # Note: you can access the transition and observation probabilities through the POMDPs.transtion and POMDPs.observation, and query individual probabilities with the pdf function. For example if you want to use more mathematical-looking functions, you could use the following:
-# Z(o | a, s') can be programmed with
 Z(m::POMDP, a, sp, o) = pdf(observation(m, a, sp), o)
-# T(s' | s, a) can be programmed with
 T(m::POMDP, s, a, sp) = pdf(transition(m, s, a), sp)
-
-beliefvec(b::DiscreteBelief) = b.b # this function may be helpful to get the belief as a vector in stateindex order
+# this function may be helpful to get the belief as a vector in stateindex order
+beliefvec(b::DiscreteBelief) = b.b 
 function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
     bp_vec = zeros(length(states(up.m)))
     for sp in states(up.m)
@@ -35,9 +33,8 @@ function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
         end
         bp_vec[stateindex(up.m, sp)] = Z(m::POMDP, a, sp, o)*sumPred
     end
-    # Fill in code for belief update
-    # Note that the ordering of the entries in bp_vec must be consistent with stateindex(m, s) (the container returned by states(m) does not necessarily obey this order)
-
+    # Normalize belief vector
+    bp_vec = bp_vec./sum(bp_vec)
     return DiscreteBelief(up.m, bp_vec)
 end
 # POMDPs.transtion and POMDPs.observation return distribution objects. See the POMDPs.jl documentation for more details.
@@ -63,10 +60,8 @@ struct HW6AlphaVectorPolicy{A} <: Policy
 end
 
 function POMDPs.action(p::HW6AlphaVectorPolicy, b::DiscreteBelief)
-
-    # Fill in code to choose action based on alpha vectors
-
-    return first(actions(b.pomdp))
+    # choose action based on alpha vectors
+    return p.alpha_actions(argmax(idx->(p.alphas(idx)'*b.b)))
 end
 
 #------
