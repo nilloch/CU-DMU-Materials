@@ -2,9 +2,10 @@ using POMDPs
 using DMUStudent.HW6
 using POMDPTools: transition_matrices, reward_vectors, SparseCat, Deterministic, RolloutSimulator, DiscreteBelief, FunctionPolicy, ordered_states, ordered_actions, DiscreteUpdater
 using QuickPOMDPs: QuickPOMDP
-using POMDPModels: TigerPOMDP
+using POMDPModels: TigerPOMDP, TIGER_LEFT, TIGER_RIGHT, TIGER_LISTEN, TIGER_OPEN_LEFT, TIGER_OPEN_RIGHT
 using NativeSARSOP: SARSOPSolver
 using POMDPTesting: has_consistent_distributions
+using LinearAlgebra
 # Collin Hudson 4/7/2024 Homework 6
 ##################
 # Problem 1: Tiger
@@ -102,13 +103,14 @@ function qmdp_solve(m, discount=discount(m))
     Q = value_iteration(m,discount,true)
 
     acts = actiontype(m)[]
-    alphas = Vector{Vector{Float64}}[]
+    alphas = Vector{Float64}[]
     for a in ordered_actions(m)
         push!(acts,a)
-        aVec = Vector{Float64}[]
+        # @show typeof(Q[a])
+        # @show typeof(alphas)
+        push!(alphas,Q[a])
         # Fill in alpha vector calculation
         # Note that the ordering of the entries in the alpha vectors must be consistent with stateindex(m, s) (states(m) does not necessarily obey this order, but ordered_states(m) does.)
-        
     end
     return HW6AlphaVectorPolicy(alphas, acts)
 end
