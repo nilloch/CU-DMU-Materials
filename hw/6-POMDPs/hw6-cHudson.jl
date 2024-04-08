@@ -26,12 +26,16 @@ T(m::POMDP, s, a, sp) = pdf(transition(m, s, a), sp)
 beliefvec(b::DiscreteBelief) = b.b 
 function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
     bp_vec = zeros(length(states(up.m)))
-    for sp in states(up.m)
+    idxSp = 1
+    for sp in ordered_states(up.m)
         sumPred = 0
-        for s in states(up.m)
-            sumPred += T(up.m, s, a, sp)*b.b[stateindex(up.m, s)]
+        idxS = 1
+        for s in ordered_states(up.m)
+            sumPred += T(up.m, s, a, sp)*b.b[idxS]
+            idxS += 1
         end
-        bp_vec[stateindex(up.m, sp)] = Z(m::POMDP, a, sp, o)*sumPred
+        bp_vec[idxSp] = Z(m::POMDP, a, sp, o)*sumPred
+        idxSp += 1
     end
     # Normalize belief vector
     bp_vec = bp_vec./sum(bp_vec)
@@ -42,8 +46,10 @@ end
 # This is needed to automatically turn any distribution into a discrete belief.
 function POMDPs.initialize_belief(up::HW6Updater, distribution::Any)
     b_vec = zeros(length(states(up.m)))
-    for s in states(up.m)
-        b_vec[stateindex(up.m, s)] = pdf(distribution, s)
+    idx = 1
+    for s in ordered_states(up.m)
+        b_vec[idx] = pdf(distribution, s)
+        idx += 1
     end
     return DiscreteBelief(up.m, b_vec)
 end
@@ -68,14 +74,38 @@ end
 # QMDP
 #------
 
+function value_iteration(m,discount,sprc)
+    V = rand(length(states(m)))
+    Vprime = rand(length(states(m)))
+    R = reward_vectors(m)
+    T = transition_matrices(m,sparse=sprc)
+    # put your value iteration code here
+    ep = 1e-7
+    temp = Array{Float64, 2}(undef,length(states(m)),length(actions(m)))
+    a = ordered_actions(m)
+    while norm(V - Vprime,2) > ep
+        V[:] = Vprime
+        for j in axes(temp,2)
+            temp[:,j] = R[a[j]] + discount*T[a[j]]*Vprime
+        end
+        Vprime[:] = maximum(temp, dims=2)
+    end
+    for key in keys(R)
+        R[key] = R[key] + discount*V
+    end
+    return R
+end
+
 function qmdp_solve(m, discount=discount(m))
 
     # Fill in Value Iteration to compute the Q-values
+    Q = value_iteration(m,discount,true)
 
     acts = actiontype(m)[]
-    alphas = Vector{Float64}[]
-    for a in actions(m)
-
+    alphas = Vector{Vector{Float64}}[]
+    for a in ordered_actions(m)
+        push!(acts,a)
+        aVec = Vector{Float64}[]
         # Fill in alpha vector calculation
         # Note that the ordering of the entries in the alpha vectors must be consistent with stateindex(m, s) (states(m) does not necessarily obey this order, but ordered_states(m) does.)
         
