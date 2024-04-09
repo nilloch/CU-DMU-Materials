@@ -21,8 +21,8 @@ struct HW6Updater{M<:POMDP} <: Updater
 end
 
 # Note: you can access the transition and observation probabilities through the POMDPs.transtion and POMDPs.observation, and query individual probabilities with the pdf function. For example if you want to use more mathematical-looking functions, you could use the following:
-Z(m::POMDP, a, sp, o) = pdf(observation(m, a, sp), o)
-T(m::POMDP, s, a, sp) = pdf(transition(m, s, a), sp)
+Z(m::POMDP, a, sp, o) = pdf(observation(up.m, a, sp), o)
+T(m::POMDP, s, a, sp) = pdf(transition(up.m, s, a), sp)
 # this function may be helpful to get the belief as a vector in stateindex order
 beliefvec(b::DiscreteBelief) = b.b 
 function POMDPs.update(up::HW6Updater, b::DiscreteBelief, a, o)
@@ -102,7 +102,6 @@ function qmdp_solve(m, discount=discount(m))
 
     # Fill in Value Iteration to compute the Q-values
     Q = value_iteration(m,discount,true)
-    @show Q
     acts = actiontype(m)[]
     alphas = Vector{Float64}[]
     for a in ordered_actions(m)
@@ -119,8 +118,8 @@ qmdp_p = qmdp_solve(m)
 sarsop_p = solve(SARSOPSolver(), m)
 up = HW6Updater(m)
 
-@show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
-@show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
+# @show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
+# @show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
 
 # PLOT ALPHA VECTORS!!!!!!!
 
@@ -130,17 +129,63 @@ up = HW6Updater(m)
 
 cancer = QuickPOMDP(
 
-    # Fill in your actual code from last homework here
-
-    states = [:healthy, :in_situ, :invasive, :death],
+    states = [:h, :isc, :ic, :d], #healthy, in-situ-cancer, invasive-cancer, death
     actions = [:wait, :test, :treat],
-    observations = [true, false],
-    transition = (s, a) -> Deterministic(s),
-    observation = (a, sp) -> Deterministic(false),
-    reward = (s, a) -> 0.0,
-    discount = 0.99,
-    initialstate = Deterministic(:death),
-    isterminal = s->s==:death,
+    observations = [:pos, :neg],
+
+    # transition should be a function that takes in s and a and returns the distribution of s'
+    transition = function (s, a)
+        if s == :h
+            return SparseCat([:h, :isc], [0.98, 0.02])
+        elseif s == :isc && a == :treat
+            return SparseCat([:h, :isc], [0.60, 0.40])
+        elseif s == :isc && a != :treat
+            return SparseCat([:isc, :ic], [0.90, 0.10])
+        elseif s == :ic && a == :treat
+            return SparseCat([:h, :d], [0.20, 0.80])
+        elseif s == :ic && a != :treat
+            return SparseCat([:ic, :d], [0.40, 0.60])
+        else
+            return SparseCat([s], [1])
+        end
+    end,
+
+    # observation should be a function that takes in s, a, and sp, and returns the distribution of o
+    observation = function (a, sp)
+        if a == :test
+            if sp == :h
+                return SparseCat([:pos, :neg], [0.05, 0.95])
+            elseif sp == :isc
+                return SparseCat([:pos, :neg], [0.80, 0.20])
+            elseif sp == :ic
+                return SparseCat([:pos], [1])
+            else
+                return SparseCat([:neg], [1])
+            end
+        elseif a == :treat && (sp == :isc || sp == :ic)
+            return SparseCat([:pos], [1])
+        else
+            return SparseCat([:neg], [1])
+        end
+    end,
+
+    reward = function (s, a)
+        if s == :d
+            return 0.0
+        elseif a == :wait
+            return 1.0
+        elseif a == :test
+            return 0.8
+        elseif a == :treat
+            return 0.1
+        else
+            return 0.0
+        end
+    end,
+
+    initialstate = SparseCat([:h], [1]),
+
+    discount = 0.99
 )
 
 @assert has_consistent_distributions(cancer)
@@ -151,16 +196,15 @@ up = HW6Updater(cancer)
 
 heuristic = FunctionPolicy(function (b)
 
-                               # Fill in your heuristic policy here
-                               # Use pdf(b, s) to get the probability of a state
+    # Fill in your heuristic policy here
+    # Use pdf(b, s) to get the probability of a state
 
-                               return :wait
-                           end
-                          )
-
-@show mean(simulate(RolloutSimulator(), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
-@show mean(simulate(RolloutSimulator(), cancer, heuristic, up) for _ in 1:1000)
-@show mean(simulate(RolloutSimulator(), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
+    return :wait
+end
+)
+@show mean(simulate(RolloutSimulator(max_steps=5000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
+# @show mean(simulate(RolloutSimulator(max_steps=100000), cancer, heuristic, up) for _ in 1:1000)
+@show mean(simulate(RolloutSimulator(max_steps=1000), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
 
 #####################
 # Problem 3: LaserTag
@@ -172,7 +216,7 @@ qmdp_p = qmdp_solve(m)
 up = DiscreteUpdater(m) # you may want to replace this with your updater to test it
 
 # Use this version with only 100 episodes to check how well you are doing quickly
-@show HW6.evaluate((qmdp_p, up), n_episodes=100)
+# @show HW6.evaluate((qmdp_p, up), n_episodes=100)
 
 # A good approach to try is POMCP, implemented in the BasicPOMCP.jl package:
 using BasicPOMCP
@@ -185,7 +229,7 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
 end
 pomcp_p = pomcp_solve(m)
 
-@show HW6.evaluate((pomcp_p, up), n_episodes=100)
+# @show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
 # When you get ready to submit, use this version with the full 1000 episodes
 # HW6.evaluate((qmdp_p, up), "REPLACE_WITH_YOUR_EMAIL@colorado.edu")
@@ -196,19 +240,19 @@ pomcp_p = pomcp_solve(m)
 #----------------
 
 # You can make a gif showing what's going on like this:
-using POMDPGifs
-import Cairo, Fontconfig # needed to display properly
+# using POMDPGifs
+# import Cairo, Fontconfig # needed to display properly
 
-makegif(m, qmdp_p, up, max_steps=30, filename="lasertag.gif")
+# makegif(m, qmdp_p, up, max_steps=30, filename="lasertag.gif")
 
-# You can render a single frame like this
-using POMDPTools: stepthrough, render
-using Compose: draw, PNG
+# # You can render a single frame like this
+# using POMDPTools: stepthrough, render
+# using Compose: draw, PNG
 
-history = []
-for step in stepthrough(m, qmdp_p, up, max_steps=10)
-    push!(history, step)
-end
-displayable_object = render(m, last(history))
-# display(displayable_object) # <-this will work in a jupyter notebook or if you have vs code or ElectronDisplay
-draw(PNG("lasertag.png"), displayable_object)
+# history = []
+# for step in stepthrough(m, qmdp_p, up, max_steps=10)
+#     push!(history, step)
+# end
+# displayable_object = render(m, last(history))
+# # display(displayable_object) # <-this will work in a jupyter notebook or if you have vs code or ElectronDisplay
+# draw(PNG("lasertag.png"), displayable_object)
