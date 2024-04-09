@@ -17,7 +17,6 @@ using LinearAlgebra
 
 struct HW6Updater{M<:POMDP} <: Updater
     m::M
-    
 end
 
 # Note: you can access the transition and observation probabilities through the POMDPs.transtion and POMDPs.observation, and query individual probabilities with the pdf function. For example if you want to use more mathematical-looking functions, you could use the following:
@@ -93,7 +92,7 @@ function value_iteration(m,discount,sprc)
     end
     #Calculate Q (by replacing R)
     for key in keys(R)
-        R[key] = R[key] + discount*T[key]'*V
+        R[key] = R[key] + discount*T[key]*V
     end
     return R
 end
@@ -202,7 +201,7 @@ heuristic = FunctionPolicy(function (b)
     return :wait
 end
 )
-@show mean(simulate(RolloutSimulator(max_steps=5000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
+@show mean(simulate(RolloutSimulator(max_steps=1000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
 # @show mean(simulate(RolloutSimulator(max_steps=100000), cancer, heuristic, up) for _ in 1:1000)
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
 
@@ -227,7 +226,7 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
                          estimate_value=FORollout(FunctionPolicy(s->rand(actions(m)))))
     return solve(solver, m)
 end
-pomcp_p = pomcp_solve(m)
+# pomcp_p = pomcp_solve(m)
 
 # @show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
