@@ -8,6 +8,7 @@ using POMDPTesting: has_consistent_distributions
 using POMDPPolicies: alphavectors
 using LinearAlgebra
 using Plots: plot, plot!
+using BasicPOMCP
 # Collin Hudson 4/7/2024 Homework 6
 ##################
 # Problem 1: Tiger
@@ -111,7 +112,7 @@ function qmdp_solve(m, discount=discount(m))
     end
     return HW6AlphaVectorPolicy(alphas, acts)
 end
-
+#=
 m = TigerPOMDP()
 
 qmdp_p = qmdp_solve(m)
@@ -235,11 +236,11 @@ end
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, heuristic, up) for _ in 1:1000)
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
-
+=#
 #####################
 # Problem 3: LaserTag
 #####################
-#=
+
 m = LaserTagPOMDP()
 
 qmdp_p = qmdp_solve(m)
@@ -249,12 +250,11 @@ up = DiscreteUpdater(m) # you may want to replace this with your updater to test
 # @show HW6.evaluate((qmdp_p, up), n_episodes=100)
 
 # A good approach to try is POMCP, implemented in the BasicPOMCP.jl package:
-using BasicPOMCP
 function pomcp_solve(m) # this function makes capturing m in the rollout policy more efficient
-    solver = POMCPSolver(tree_queries=10,
-                         c=1.0,
-                         default_action=first(actions(m)),
-                         estimate_value=FORollout(FunctionPolicy(s->rand(actions(m)))))
+    solver = POMCPSolver(tree_queries=100,
+        c=10.0,
+        default_action=rand(actions(m)),
+        estimate_value=FORollout(FunctionPolicy(s->rand(actions(m)))))
     return solve(solver, m)
 end
 pomcp_p = pomcp_solve(m)
@@ -263,7 +263,7 @@ pomcp_p = pomcp_solve(m)
 
 # When you get ready to submit, use this version with the full 1000 episodes
 # HW6.evaluate((qmdp_p, up), "REPLACE_WITH_YOUR_EMAIL@colorado.edu")
-=#
+
 
 #----------------
 # Visualization
