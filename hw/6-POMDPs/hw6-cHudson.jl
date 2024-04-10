@@ -5,7 +5,9 @@ using QuickPOMDPs: QuickPOMDP
 using POMDPModels: TigerPOMDP, TIGER_LEFT, TIGER_RIGHT, TIGER_LISTEN, TIGER_OPEN_LEFT, TIGER_OPEN_RIGHT
 using NativeSARSOP: SARSOPSolver
 using POMDPTesting: has_consistent_distributions
+using POMDPPolicies: alphavectors
 using LinearAlgebra
+using Plots: plot, plot!
 # Collin Hudson 4/7/2024 Homework 6
 ##################
 # Problem 1: Tiger
@@ -119,9 +121,24 @@ up = HW6Updater(m)
 
 # @show mean(simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:5000)
 # @show mean(simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:5000)
-
+maxRuns = 5000
+resultsQMDP = [simulate(RolloutSimulator(max_steps=500), m, qmdp_p, up) for _ in 1:maxRuns]
+@show meanQMDP = sum(resultsQMDP)/maxRuns
+@show SEMQMDP = sqrt(sum(abs2,(resultsQMDP .- meanQMDP))/maxRuns^2)
+resultsSARSOP = [simulate(RolloutSimulator(max_steps=500), m, sarsop_p, up) for _ in 1:maxRuns]
+@show meanSARSOP = sum(resultsSARSOP)/maxRuns
+@show SEMSARSOP = sqrt(sum(abs2,(resultsSARSOP .- meanSARSOP))/maxRuns^2)
 # PLOT ALPHA VECTORS!!!!!!!
-
+qmdpAlphas = plot(title="QMDP Alpha Vectors")
+for j in eachindex(qmdp_p.alphas)
+    plot!(qmdpAlphas,[0,1],qmdp_p.alphas[j],label=string("action: ",qmdp_p.alpha_actions[j]))
+end
+sarsopAlphas = plot(title="SARSOP Alpha Vectors")
+for j in eachindex(alphavectors(sarsop_p))
+    plot!(sarsopAlphas,[0,1],alphavectors(sarsop_p)[j],label=string("action: ",j))
+end
+display(qmdpAlphas)
+display(sarsopAlphas)
 ###################
 # Problem 2: Cancer
 ###################
@@ -197,18 +214,32 @@ heuristic = FunctionPolicy(function (b)
 
     # Fill in your heuristic policy here
     # Use pdf(b, s) to get the probability of a state
-
-    return :wait
+    # @show pdf(b,:isc)
+    if pdf(b,:isc) > 0.1
+        return :treat
+    elseif pdf(b,:ic) > 0.9
+        if rand() < 0.5
+            return :treat
+        else
+            return :wait
+        end
+    else
+        if rand() < 0.8
+            return :test
+        else
+            return :wait
+        end
+    end
 end
 )
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
-# @show mean(simulate(RolloutSimulator(max_steps=100000), cancer, heuristic, up) for _ in 1:1000)
+@show mean(simulate(RolloutSimulator(max_steps=1000), cancer, heuristic, up) for _ in 1:1000)
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
 
 #####################
 # Problem 3: LaserTag
 #####################
-
+#=
 m = LaserTagPOMDP()
 
 qmdp_p = qmdp_solve(m)
@@ -226,12 +257,13 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
                          estimate_value=FORollout(FunctionPolicy(s->rand(actions(m)))))
     return solve(solver, m)
 end
-# pomcp_p = pomcp_solve(m)
+pomcp_p = pomcp_solve(m)
 
-# @show HW6.evaluate((pomcp_p, up), n_episodes=100)
+@show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
 # When you get ready to submit, use this version with the full 1000 episodes
 # HW6.evaluate((qmdp_p, up), "REPLACE_WITH_YOUR_EMAIL@colorado.edu")
+=#
 
 #----------------
 # Visualization
