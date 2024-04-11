@@ -9,6 +9,7 @@ using POMDPPolicies: alphavectors
 using LinearAlgebra
 using Plots: plot, plot!
 using BasicPOMCP
+using DiscreteValueIteration
 # Collin Hudson 4/7/2024 Homework 6
 ##################
 # Problem 1: Tiger
@@ -254,7 +255,7 @@ function pomcp_solve(m) # this function makes capturing m in the rollout policy 
     solver = POMCPSolver(tree_queries=100,
         c=10.0,
         default_action=rand(actions(m)),
-        estimate_value=FORollout(FunctionPolicy(s->rand(actions(m)))))
+        estimate_value=FORollout(ValueIterationSolver()))
     return solve(solver, m)
 end
 pomcp_p = pomcp_solve(m)
