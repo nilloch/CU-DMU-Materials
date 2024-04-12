@@ -113,7 +113,7 @@ function qmdp_solve(m, discount=discount(m))
     end
     return HW6AlphaVectorPolicy(alphas, acts)
 end
-#=
+
 m = TigerPOMDP()
 
 qmdp_p = qmdp_solve(m)
@@ -237,7 +237,7 @@ end
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, qmdp_p, up) for _ in 1:1000)     # Should be approximately 66
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, heuristic, up) for _ in 1:1000)
 @show mean(simulate(RolloutSimulator(max_steps=1000), cancer, sarsop_p, up) for _ in 1:1000)   # Should be approximately 79
-=#
+
 #####################
 # Problem 3: LaserTag
 #####################
@@ -253,17 +253,17 @@ up = DiscreteUpdater(m) # you may want to replace this with your updater to test
 # A good approach to try is POMCP, implemented in the BasicPOMCP.jl package:
 function pomcp_solve(m) # this function makes capturing m in the rollout policy more efficient
     solver = POMCPSolver(tree_queries=100,
-        c=10.0,
+        c=2.0,
         default_action=rand(actions(m)),
         estimate_value=FORollout(ValueIterationSolver()))
     return solve(solver, m)
 end
 pomcp_p = pomcp_solve(m)
 
-@show HW6.evaluate((pomcp_p, up), n_episodes=100)
+# @show HW6.evaluate((pomcp_p, up), n_episodes=100)
 
 # When you get ready to submit, use this version with the full 1000 episodes
-# HW6.evaluate((qmdp_p, up), "REPLACE_WITH_YOUR_EMAIL@colorado.edu")
+HW6.evaluate((pomcp_p, up), "collin.hudson@colorado.edu")
 
 
 #----------------
